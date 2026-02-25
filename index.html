@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GestureBoard — Hand-Controlled Whiteboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Bebas+Neue&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --accent: #00ffcc;
+    --accent2: #ff3366;
+    --accent3: #ffcc00;
+    --text: #e0e0f0;
+    --muted: #4a4a6a;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Bebas Neue', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    user-select: none;
+  }
+
+  /* ── Canvas Layer ── */
+  #canvas-container {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+  }
+
+  #drawCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: none;
+  }
+
+  /* ── Camera Feed ── */
+  #cameraPanel {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,255,204,0.15);
+    transition: opacity 0.3s;
+  }
+  #cameraPanel:hover { opacity: 0.3; }
+
+  #webcam {
+    display: block;
+    width: 240px;
+    height: 180px;
+    object-fit: cover;
+    transform: scaleX(-1);
+    background: #000;
+  }
+
+  #cameraOverlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 240px;
+    height: 180px;
+    pointer-events: none;
+    /* Mirror to match the flipped video */
+    transform: scaleX(-1);
+  }
+
+  .cam-label {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  /* ── HUD ── */
+  #hud {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .hud-title {
+    font-family: var(--display);
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    line-height: 1;
+    text-shadow: 0 0 20px rgba(0,255,204,0.4);
+  }
+
+  .hud-panel {
+    background: rgba(10,10,15,0.85);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--accent);
+    padding: 10px 14px;
+    font-size: 10px;
+    line-height: 1.8;
+    letter-spacing: 1px;
+    backdrop-filter: blur(8px);
+    min-width: 220px;
+  }
+
+  .hud-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .hud-key { color: var(--muted); text-transform: uppercase; }
+  .hud-val { color: var(--text); font-weight: 700; }
+  .hud-val.active { color: var(--accent); }
+  .hud-val.draw { color: var(--accent3); }
+  .hud-val.erase { color: var(--accent2); }
+  .hud-val.pan { color: #aa88ff; }
+
+  /* ── Gesture Legend ── */
+  #gestureLegend {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 10;
+    background: rgba(10,10,15,0.85);
+    border: 1px solid var(--border);
+    border-right: 2px solid var(--accent);
+    padding: 12px 16px;
+    font-size: 9px;
+    line-height: 2;
+    letter-spacing: 1px;
+    backdrop-filter: blur(8px);
+    pointer-events: none;
+    max-width: 220px;
+  }
+
+  .legend-title {
+    font-family: var(--display);
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+
+  .legend-item { display: flex; gap: 10px; align-items: center; }
+  .legend-icon { font-size: 14px; width: 20px; text-align: center; }
+  .legend-desc { color: var(--muted); }
+  .legend-desc span { color: var(--text); }
+
+  /* ── Status Bar ── */
+  #statusBar {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    z-index: 10;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    animation: pulse 2s infinite;
+  }
+  .status-dot.ready { background: var(--accent); }
+  .status-dot.loading { background: var(--accent3); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── Loading Screen ── */
+  #loadingScreen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  .loading-title {
+    font-family: var(--display);
+    font-size: 52px;
+    letter-spacing: 8px;
+    color: var(--accent);
+    text-shadow: 0 0 40px rgba(0,255,204,0.3);
+  }
+
+  .loading-sub {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .loading-bar-wrap {
+    width: 260px;
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .loading-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 10px var(--accent);
+  }
+
+  .loading-step {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+  }
+
+  /* ── Gesture Flash ── */
+  #gestureFlash {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 20;
+    font-family: var(--display);
+    font-size: 80px;
+    letter-spacing: 6px;
+    color: var(--accent2);
+    text-shadow: 0 0 60px rgba(255,51,102,0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+  }
+  #gestureFlash.show { opacity: 1; }
+
+  /* ── Crosshair cursor ── */
+  #crosshair {
+    position: fixed;
+    z-index: 15;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    display: none;
+  }
+
+  .ch-ring {
+    width: 24px; height: 24px;
+    border: 1.5px solid var(--accent);
+    border-radius: 50%;
+    position: relative;
+  }
+
+  .ch-dot {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 4px; height: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+    transform: translate(-50%,-50%);
+  }
+
+  #crosshair.drawing .ch-ring { border-color: var(--accent3); }
+  #crosshair.drawing .ch-dot { background: var(--accent3); }
+</style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loadingScreen">
+  <div class="loading-title">GESTUREBOARD</div>
+  <div class="loading-sub">Hand-Controlled Canvas System</div>
+  <div class="loading-bar-wrap">
+    <div class="loading-bar" id="loadingBar"></div>
+  </div>
+  <div class="loading-step" id="loadingStep">Initializing...</div>
+</div>
+
+<!-- Gesture Flash -->
+<div id="gestureFlash"></div>
+
+<!-- Main Canvas -->
+<div id="canvas-container">
+  <canvas id="drawCanvas"></canvas>
+</div>
+
+<!-- Crosshair -->
+<div id="crosshair">
+  <div class="ch-ring"><div class="ch-dot"></div></div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-title">GESTUREBOARD</div>
+  <div class="hud-panel">
+    <div class="hud-row">
+      <span class="hud-key">MODE</span>
+      <span class="hud-val" id="hudMode">PASSIVE</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-key">GESTURE</span>
+      <span class="hud-val active" id="hudGesture">—</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-key">POLYGONS</span>
+      <span class="hud-val" id="hudPolygons">0</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-key">ZOOM</span>
+      <span class="hud-val" id="hudZoom">100%</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-key">FPS</span>
+      <span class="hud-val active" id="hudFps">—</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-key">HANDS</span>
+      <span class="hud-val" id="hudHands">0</span>
+    </div>
+  </div>
+</div>
+
+<!-- Gesture Legend -->
+<div id="gestureLegend">
+  <div class="legend-title">GESTURES</div>
+  <div class="legend-item">
+    <span class="legend-icon">☝️</span>
+    <span class="legend-desc"><span>Point</span> — Draw polygon</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-icon">✌️</span>
+    <span class="legend-desc"><span>Peace</span> — Finalize polygon</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-icon">🤌</span>
+    <span class="legend-desc"><span>Pinch</span> (2H) Zoom/Pan</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-icon">✊</span>
+    <span class="legend-desc"><span>Fist</span> — Erase canvas</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-icon">🤘</span>
+    <span class="legend-desc"><span>Rock-on</span> — Undo last</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-icon">🖐️</span>
+    <span class="legend-desc"><span>Open hand</span> — Pan canvas</span>
+  </div>
+</div>
+
+<!-- Status Bar -->
+<div id="statusBar">
+  <div class="status-dot" id="statusDot"></div>
+  <span id="statusText">INITIALIZING</span>
+</div>
+
+<!-- Camera Panel -->
+<div id="cameraPanel">
+  <video id="webcam" autoplay muted playsinline></video>
+  <canvas id="cameraOverlay"></canvas>
+  <div class="cam-label">LIVE</div>
+</div>
+
+<!-- MediaPipe via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script>
+'use strict';
+/**
+ * ═══════════════════════════════════════════════════════
+ *  GESTUREBOARD — Hand-Controlled Whiteboard
+ *  Architecture:
+ *   - GestureEngine   : MediaPipe hand detection + gesture classification
+ *   - PointerSmoother : Kalman-like exponential smoothing
+ *   - DrawingEngine   : Polygon state & canvas rendering
+ *   - TransformEngine : Zoom / pan matrix management
+ *   - HUD             : Overlay UI updates
+ *   - App             : Main orchestrator / event loop
+ * ═══════════════════════════════════════════════════════
+ */
+
+// ─────────────────────────────────────────────
+//  CONSTANTS
+// ─────────────────────────────────────────────
+const COLORS = {
+  bg:       '#0a0a0f',
+  grid:     'rgba(30,30,50,0.6)',
+  polygon:  'rgba(0,255,204,0.85)',
+  polygonFill: 'rgba(0,255,204,0.06)',
+  polyDraft:'rgba(255,204,0,0.85)',
+  polyDraftFill: 'rgba(255,204,0,0.04)',
+  eraseFlash:'rgba(255,51,102,0.12)',
+  cursor:   '#00ffcc',
+  cursorDraw:'#ffcc00',
+};
+
+const SMOOTH_FACTOR  = 0.28; // lower = smoother but laggier
+const FINALIZE_DIST  = 30;   // px to close a polygon
+const MIN_POLY_VERTS = 3;
+const HOLD_FRAMES    = 12;   // frames to confirm gesture
+
+// ─────────────────────────────────────────────
+//  POINTER SMOOTHER  (exponential moving average)
+// ─────────────────────────────────────────────
+class PointerSmoother {
+  constructor(alpha = SMOOTH_FACTOR) {
+    this.alpha = alpha;
+    this.x = null; this.y = null;
+  }
+  update(nx, ny) {
+    if (this.x === null) { this.x = nx; this.y = ny; return { x: nx, y: ny }; }
+    this.x += this.alpha * (nx - this.x);
+    this.y += this.alpha * (ny - this.y);
+    return { x: this.x, y: this.y };
+  }
+  reset() { this.x = null; this.y = null; }
+}
+
+// ─────────────────────────────────────────────
+//  TRANSFORM ENGINE  (zoom & pan)
+// ─────────────────────────────────────────────
+class TransformEngine {
+  constructor() {
+    this.scale = 1;
+    this.tx = 0;
+    this.ty = 0;
+    this._pinchStart = null;
+    this._panStart = null;
+  }
+
+  // Apply current transform to canvas context
+  apply(ctx) {
+    ctx.setTransform(this.scale, 0, 0, this.scale, this.tx, this.ty);
+  }
+
+  // Convert screen → world coordinates
+  toWorld(sx, sy) {
+    return {
+      x: (sx - this.tx) / this.scale,
+      y: (sy - this.ty) / this.scale
+    };
+  }
+
+  // Convert world → screen coordinates
+  toScreen(wx, wy) {
+    return {
+      x: wx * this.scale + this.tx,
+      y: wy * this.scale + this.ty
+    };
+  }
+
+  startPinch(c1, c2) {
+    const cx = (c1.x + c2.x) / 2;
+    const cy = (c1.y + c2.y) / 2;
+    const d  = Math.hypot(c2.x - c1.x, c2.y - c1.y);
+    this._pinchStart = { cx, cy, d, scale: this.scale, tx: this.tx, ty: this.ty };
+  }
+
+  updatePinch(c1, c2) {
+    if (!this._pinchStart) return;
+    const cx = (c1.x + c2.x) / 2;
+    const cy = (c1.y + c2.y) / 2;
+    const d  = Math.hypot(c2.x - c1.x, c2.y - c1.y);
+    const ps = this._pinchStart;
+
+    const newScale = Math.max(0.2, Math.min(8, ps.scale * (d / ps.d)));
+    // Zoom around pinch center
+    this.tx = cx - (ps.cx - ps.tx) * (newScale / ps.scale);
+    this.ty = cy - (ps.cy - ps.ty) * (newScale / ps.scale);
+    this.scale = newScale;
+  }
+
+  endPinch() { this._pinchStart = null; }
+
+  startPan(cx, cy) {
+    this._panStart = { cx, cy, tx: this.tx, ty: this.ty };
+  }
+
+  updatePan(cx, cy) {
+    if (!this._panStart) return;
+    const ps = this._panStart;
+    this.tx = ps.tx + (cx - ps.cx);
+    this.ty = ps.ty + (cy - ps.cy);
+  }
+
+  endPan() { this._panStart = null; }
+
+  reset() {
+    this.scale = 1; this.tx = 0; this.ty = 0;
+    this._pinchStart = null; this._panStart = null;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  DRAWING ENGINE  (polygon state & rendering)
+// ─────────────────────────────────────────────
+class DrawingEngine {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx    = canvas.getContext('2d');
+    this.transform = new TransformEngine();
+
+    this.polygons  = [];   // finalized polygons [{pts:[{x,y}…], color}]
+    this.draftPts  = [];   // current in-progress polygon
+    this.cursorPos = null; // {x,y} screen space
+    this.isDraft   = false;
+    this.history   = [];   // for undo
+
+    this._gridCanvas = null;
+    this._frameCount = 0;
+
+    this._buildGrid();
+    this._resize();
+    window.addEventListener('resize', () => this._resize());
+  }
+
+  _resize() {
+    this.canvas.width  = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    this._buildGrid();
+  }
+
+  _buildGrid() {
+    // Pre-render grid into an offscreen canvas for performance
+    const gc = document.createElement('canvas');
+    gc.width  = window.innerWidth;
+    gc.height = window.innerHeight;
+    const gx  = gc.getContext('2d');
+    const W = gc.width, H = gc.height;
+    const step = 48;
+    gx.strokeStyle = COLORS.grid;
+    gx.lineWidth   = 0.5;
+    for (let x = 0; x < W; x += step) {
+      gx.beginPath(); gx.moveTo(x, 0); gx.lineTo(x, H); gx.stroke();
+    }
+    for (let y = 0; y < H; y += step) {
+      gx.beginPath(); gx.moveTo(0, y); gx.lineTo(W, y); gx.stroke();
+    }
+    this._gridCanvas = gc;
+  }
+
+  // Add a point to the current draft polygon
+  addDraftPoint(worldX, worldY) {
+    if (!this.isDraft) { this.isDraft = true; this.draftPts = []; }
+    const last = this.draftPts[this.draftPts.length - 1];
+    // Only add if moved more than 3 world units to avoid duplicate points
+    if (!last || Math.hypot(worldX - last.x, worldY - last.y) > 3) {
+      this.draftPts.push({ x: worldX, y: worldY });
+    }
+  }
+
+  // Finalize current draft as a permanent polygon
+  finalizePolygon() {
+    if (this.draftPts.length >= MIN_POLY_VERTS) {
+      this.history.push([...this.polygons]);
+      this.polygons.push({
+        pts: [...this.draftPts],
+        color: COLORS.polygon,
+        fill: COLORS.polygonFill
+      });
+    }
+    this.draftPts = [];
+    this.isDraft  = false;
+  }
+
+  // Cancel current draft
+  cancelDraft() {
+    this.draftPts = [];
+    this.isDraft  = false;
+  }
+
+  // Undo last polygon
+  undo() {
+    if (this.history.length > 0) {
+      this.polygons = this.history.pop();
+    }
+    this.cancelDraft();
+  }
+
+  // Erase everything
+  eraseAll() {
+    this.history.push([...this.polygons]);
+    this.polygons = [];
+    this.cancelDraft();
+  }
+
+  // Main render call (called every animation frame)
+  render(cursorScreenPos, isDrawing) {
+    const ctx = this.ctx;
+    const W   = this.canvas.width;
+    const H   = this.canvas.height;
+    this._frameCount++;
+
+    // 1. Clear
+    ctx.resetTransform();
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // 2. Draw background grid (in screen space, no transform)
+    if (this._gridCanvas) ctx.drawImage(this._gridCanvas, 0, 0);
+
+    // 3. Apply world transform
+    this.transform.apply(ctx);
+
+    // 4. Render finalized polygons
+    for (const poly of this.polygons) {
+      this._drawPolygon(ctx, poly.pts, poly.color, poly.fill, false);
+    }
+
+    // 5. Render draft polygon
+    if (this.draftPts.length > 0) {
+      this._drawPolygon(ctx, this.draftPts, COLORS.polyDraft, COLORS.polyDraftFill, true);
+
+      // Draw preview line from last point to cursor
+      if (cursorScreenPos) {
+        const cw = this.transform.toWorld(cursorScreenPos.x, cursorScreenPos.y);
+        const last = this.draftPts[this.draftPts.length - 1];
+        ctx.beginPath();
+        ctx.moveTo(last.x, last.y);
+        ctx.lineTo(cw.x, cw.y);
+        ctx.strokeStyle = 'rgba(255,204,0,0.4)';
+        ctx.lineWidth   = 1 / this.transform.scale;
+        ctx.setLineDash([4 / this.transform.scale, 4 / this.transform.scale]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // 6. Back to screen space for cursor
+    ctx.resetTransform();
+
+    // 7. Cursor crosshair
+    if (cursorScreenPos) {
+      this._drawCursor(ctx, cursorScreenPos.x, cursorScreenPos.y, isDrawing);
+    }
+  }
+
+  _drawPolygon(ctx, pts, strokeColor, fillColor, open) {
+    if (pts.length < 2) return;
+    const lw = 1.5 / this.transform.scale;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    if (!open) ctx.closePath();
+    ctx.fillStyle   = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth   = lw;
+    ctx.lineJoin    = 'round';
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+
+    // Vertex dots
+    ctx.fillStyle = strokeColor;
+    const r = 2.5 / this.transform.scale;
+    for (const p of pts) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  _drawCursor(ctx, sx, sy, drawing) {
+    const color = drawing ? COLORS.cursorDraw : COLORS.cursor;
+    const r = 10;
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 1.5;
+    ctx.globalAlpha = 0.8;
+    ctx.stroke();
+
+    // Cross hairs
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(-r * 1.6, 0); ctx.lineTo(-r * 0.4, 0);
+    ctx.moveTo(r * 0.4, 0);  ctx.lineTo(r * 1.6, 0);
+    ctx.moveTo(0, -r * 1.6); ctx.lineTo(0, -r * 0.4);
+    ctx.moveTo(0, r * 0.4);  ctx.lineTo(0, r * 1.6);
+    ctx.strokeStyle = color;
+    ctx.stroke();
+
+    // Center dot
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, 2, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // Flash erase effect
+  flashErase() {
+    const ctx = this.ctx;
+    ctx.resetTransform();
+    ctx.fillStyle = COLORS.eraseFlash;
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  GESTURE ENGINE  (MediaPipe hand analysis)
+// ─────────────────────────────────────────────
+class GestureEngine {
+  constructor(videoEl, overlayCanvas, onResults) {
+    this.videoEl      = videoEl;
+    this.overlayCanvas = overlayCanvas;
+    this.overlayCtx   = overlayCanvas.getContext('2d');
+    this.onResults    = onResults;
+
+    this._smoothers   = [new PointerSmoother(SMOOTH_FACTOR), new PointerSmoother(SMOOTH_FACTOR)];
+    this._lastGesture = ['none', 'none'];
+    this._holdCount   = [0, 0];
+    this._confirmedGesture = ['none', 'none'];
+
+    this.hands = null;
+    this.camera = null;
+  }
+
+  async init(onProgress) {
+    // Configure MediaPipe Hands
+    this.hands = new Hands({
+      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+    });
+
+    this.hands.setOptions({
+      maxNumHands:      2,
+      modelComplexity:  1,
+      minDetectionConfidence: 0.72,
+      minTrackingConfidence:  0.72,
+    });
+
+    this.hands.onResults(r => this._processResults(r));
+
+    onProgress('Loading hand detection model…', 30);
+    await this.hands.initialize();
+    onProgress('Starting camera…', 60);
+
+    this.camera = new Camera(this.videoEl, {
+      onFrame: async () => {
+        this.overlayCanvas.width  = this.videoEl.videoWidth  || 640;
+        this.overlayCanvas.height = this.videoEl.videoHeight || 480;
+        await this.hands.send({ image: this.videoEl });
+      },
+      width: 640, height: 480,
+    });
+
+    await this.camera.start();
+    onProgress('Ready', 100);
+  }
+
+  // Classify a single hand's landmarks into a gesture string
+  _classify(lm) {
+    // Landmark indices:
+    // 4=thumb tip, 8=index tip, 12=middle tip, 16=ring tip, 20=pinky tip
+    // 2=thumb ip, 5=index mcp, 9=middle mcp, 13=ring mcp, 17=pinky mcp
+
+    const tipIds = [4, 8, 12, 16, 20];
+    const pipIds = [2, 6, 10, 14, 18]; // PIP joints (proxy for "curl")
+
+    const fingerUp = tipIds.map((tip, i) => {
+      if (i === 0) {
+        // Thumb: compare x (for right-ish hand orientation)
+        return lm[tip].x < lm[pipIds[i]].x;
+      }
+      return lm[tip].y < lm[pipIds[i]].y; // tip above pip = extended
+    });
+
+    const [thumb, index, middle, ring, pinky] = fingerUp;
+    const extCount = fingerUp.filter(Boolean).length;
+
+    // ── Gesture rules ──────────────────────────
+    if (!thumb && !index && !middle && !ring && !pinky) return 'fist';
+    if (!thumb && index && !middle && !ring && !pinky)  return 'point';
+    if (!thumb && index && middle && !ring && !pinky)   return 'peace';
+    if (thumb && index && !middle && !ring && !pinky)   return 'pinch';
+    if (!thumb && index && !middle && !ring && pinky)   return 'rockon';
+    if (thumb && index && middle && ring && pinky)      return 'open';
+
+    // Pinch detection via distance
+    const td  = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+    if (td < 0.06 && extCount <= 3) return 'pinch';
+
+    return 'unknown';
+  }
+
+  _processResults(results) {
+    const ctx  = this.overlayCtx;
+    const W    = this.overlayCanvas.width;
+    const H    = this.overlayCanvas.height;
+
+    ctx.clearRect(0, 0, W, H);
+
+    const hands = results.multiHandLandmarks || [];
+    const handCount = hands.length;
+
+    const handData = hands.map((lm, i) => {
+      // Draw skeleton on overlay
+      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: 'rgba(0,255,204,0.35)', lineWidth: 1 });
+      drawLandmarks(ctx, lm, { color: 'rgba(0,255,204,0.7)', lineWidth: 1, radius: 2 });
+
+      // Get index fingertip in video coords (note: video is mirrored in display)
+      const tip = lm[8];
+      const raw = { x: (1 - tip.x) * window.innerWidth, y: tip.y * window.innerHeight };
+      const smoothed = this._smoothers[i].update(raw.x, raw.y);
+      const gesture  = this._classify(lm);
+
+      // Gesture hold confirmation (debounce)
+      if (gesture === this._lastGesture[i]) {
+        this._holdCount[i]++;
+      } else {
+        this._holdCount[i] = 0;
+        this._lastGesture[i] = gesture;
+      }
+      if (this._holdCount[i] >= HOLD_FRAMES) {
+        this._confirmedGesture[i] = gesture;
+      }
+
+      return {
+        smoothed,
+        raw,
+        gesture,
+        confirmed: this._confirmedGesture[i],
+        lm
+      };
+    });
+
+    // Reset smoothers for missing hands
+    for (let i = handCount; i < 2; i++) {
+      this._smoothers[i].reset();
+      this._lastGesture[i]       = 'none';
+      this._holdCount[i]         = 0;
+      this._confirmedGesture[i]  = 'none';
+    }
+
+    this.onResults({ hands: handData, count: handCount });
+  }
+}
+
+// ─────────────────────────────────────────────
+//  HUD
+// ─────────────────────────────────────────────
+class HUD {
+  constructor() {
+    this._mode    = document.getElementById('hudMode');
+    this._gesture = document.getElementById('hudGesture');
+    this._polys   = document.getElementById('hudPolygons');
+    this._zoom    = document.getElementById('hudZoom');
+    this._fps     = document.getElementById('hudFps');
+    this._hands   = document.getElementById('hudHands');
+    this._flash   = document.getElementById('gestureFlash');
+    this._status  = document.getElementById('statusText');
+    this._dot     = document.getElementById('statusDot');
+
+    this._lastFlash = '';
+    this._flashTimer = null;
+  }
+
+  update({ mode, gesture, polyCount, zoom, fps, handCount }) {
+    const modeEl = this._mode;
+    modeEl.textContent = mode;
+    modeEl.className = 'hud-val';
+    if (mode === 'DRAWING') modeEl.classList.add('draw');
+    else if (mode === 'ERASE') modeEl.classList.add('erase');
+    else if (mode === 'PAN' || mode === 'ZOOM') modeEl.classList.add('pan');
+    else modeEl.classList.add('active');
+
+    this._gesture.textContent = gesture || '—';
+    this._polys.textContent   = polyCount;
+    this._zoom.textContent    = Math.round(zoom * 100) + '%';
+    this._fps.textContent     = fps;
+    this._hands.textContent   = handCount;
+  }
+
+  setStatus(text, ready = false) {
+    this._status.textContent = text;
+    this._dot.className = 'status-dot ' + (ready ? 'ready' : 'loading');
+  }
+
+  flashGesture(text) {
+    if (this._lastFlash === text) return;
+    this._lastFlash = text;
+    clearTimeout(this._flashTimer);
+    this._flash.textContent = text;
+    this._flash.classList.add('show');
+    this._flashTimer = setTimeout(() => {
+      this._flash.classList.remove('show');
+      this._lastFlash = '';
+    }, 900);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  APP  (main orchestrator)
+// ─────────────────────────────────────────────
+class App {
+  constructor() {
+    this.drawEngine   = new DrawingEngine(document.getElementById('drawCanvas'));
+    this.hud          = new HUD();
+    this.gestureEngine = null;
+
+    this._mode        = 'passive';   // passive | drawing | panning | zooming
+    this._fps         = 0;
+    this._fpsFrames   = 0;
+    this._fpsLast     = performance.now();
+    this._lastHandData = { hands: [], count: 0 };
+    this._cursorPos   = null;
+    this._eraseDebounce = false;
+    this._pinchActive = false;
+    this._panActive   = false;
+    this._lastEraseGesture = false;
+    this._lastRockGesture  = false;
+
+    // Demo polygon on startup
+    this._addDemoPolygon();
+
+    this._loop = this._loop.bind(this);
+  }
+
+  _addDemoPolygon() {
+    const W = window.innerWidth, H = window.innerHeight;
+    // Hexagon demo
+    const cx = W * 0.35, cy = H * 0.4, r = 80;
+    const pts = [];
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i - Math.PI / 6;
+      pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+    }
+    this.drawEngine.polygons.push({ pts, color: COLORS.polygon, fill: COLORS.polygonFill });
+
+    // Triangle demo
+    const cx2 = W * 0.6, cy2 = H * 0.38, r2 = 55;
+    const pts2 = [];
+    for (let i = 0; i < 3; i++) {
+      const a2 = (Math.PI * 2 / 3) * i - Math.PI / 2;
+      pts2.push({ x: cx2 + r2 * Math.cos(a2), y: cy2 + r2 * Math.sin(a2) });
+    }
+    this.drawEngine.polygons.push({ pts: pts2, color: COLORS.polygon, fill: COLORS.polygonFill });
+  }
+
+  async start() {
+    const loadBar  = document.getElementById('loadingBar');
+    const loadStep = document.getElementById('loadingStep');
+
+    const onProgress = (msg, pct) => {
+      loadBar.style.width  = pct + '%';
+      loadStep.textContent = msg;
+    };
+
+    onProgress('Loading hand detection…', 10);
+
+    this.gestureEngine = new GestureEngine(
+      document.getElementById('webcam'),
+      document.getElementById('cameraOverlay'),
+      data => { this._lastHandData = data; }
+    );
+
+    try {
+      await this.gestureEngine.init(onProgress);
+      this.hud.setStatus('TRACKING ACTIVE', true);
+    } catch (e) {
+      console.error(e);
+      this.hud.setStatus('CAMERA ERROR', false);
+      loadStep.textContent = 'Camera error: ' + e.message;
+      return;
+    }
+
+    // Hide loading screen
+    const ls = document.getElementById('loadingScreen');
+    ls.style.transition = 'opacity 0.6s';
+    ls.style.opacity    = '0';
+    setTimeout(() => ls.style.display = 'none', 700);
+
+    requestAnimationFrame(this._loop);
+  }
+
+  _loop(ts) {
+    this._fpsFrames++;
+    const elapsed = ts - this._fpsLast;
+    if (elapsed >= 500) {
+      this._fps       = Math.round((this._fpsFrames / elapsed) * 1000);
+      this._fpsFrames = 0;
+      this._fpsLast   = ts;
+    }
+
+    this._processGestures(this._lastHandData);
+
+    const isDrawing = this._mode === 'drawing';
+    this.drawEngine.render(this._cursorPos, isDrawing);
+
+    this.hud.update({
+      mode:      this._modeLabel(),
+      gesture:   this._currentGestureLabel(),
+      polyCount: this.drawEngine.polygons.length,
+      zoom:      this.drawEngine.transform.scale,
+      fps:       this._fps,
+      handCount: this._lastHandData.count,
+    });
+
+    requestAnimationFrame(this._loop);
+  }
+
+  _modeLabel() {
+    const m = this._mode;
+    if (m === 'drawing')  return 'DRAWING';
+    if (m === 'panning')  return 'PAN';
+    if (m === 'zooming')  return 'ZOOM';
+    if (m === 'erasing')  return 'ERASE';
+    return 'PASSIVE';
+  }
+
+  _currentGestureLabel() {
+    const { hands } = this._lastHandData;
+    if (!hands.length) return '—';
+    return hands.map(h => h.gesture.toUpperCase()).join(' + ');
+  }
+
+  // ── Core gesture processing ──────────────────
+  _processGestures({ hands, count }) {
+    const tr = this.drawEngine.transform;
+
+    // Cursor position from first hand index fingertip
+    if (count > 0) {
+      this._cursorPos = { ...hands[0].smoothed };
+    } else {
+      this._cursorPos = null;
+    }
+
+    // ── Two-hand gestures (zoom / pan) ──────────
+    if (count === 2) {
+      const g0 = hands[0].gesture;
+      const g1 = hands[1].gesture;
+      const bothPinch = (g0 === 'pinch' || g0 === 'open') && (g1 === 'pinch' || g1 === 'open');
+      const bothOpen  = g0 === 'open' && g1 === 'open';
+
+      if (bothPinch) {
+        const c1 = hands[0].smoothed;
+        const c2 = hands[1].smoothed;
+        if (!this._pinchActive) {
+          tr.startPinch(c1, c2);
+          this._pinchActive = true;
+        } else {
+          tr.updatePinch(c1, c2);
+        }
+        this._mode = 'zooming';
+        this.drawEngine.cancelDraft();
+        this._panActive = false;
+        this.hud.flashGesture('ZOOM');
+        return;
+      } else {
+        if (this._pinchActive) { tr.endPinch(); this._pinchActive = false; }
+      }
+
+      if (bothOpen) {
+        const cx = (hands[0].smoothed.x + hands[1].smoothed.x) / 2;
+        const cy = (hands[0].smoothed.y + hands[1].smoothed.y) / 2;
+        if (!this._panActive) {
+          tr.startPan(cx, cy);
+          this._panActive = true;
+        } else {
+          tr.updatePan(cx, cy);
+        }
+        this._mode = 'panning';
+        this.drawEngine.cancelDraft();
+        return;
+      } else {
+        if (this._panActive) { tr.endPan(); this._panActive = false; }
+      }
+    } else {
+      if (this._pinchActive) { tr.endPinch(); this._pinchActive = false; }
+      if (this._panActive)   { tr.endPan();   this._panActive = false; }
+    }
+
+    // ── Single-hand gestures ─────────────────────
+    if (count === 0) {
+      this._mode = 'passive';
+      return;
+    }
+
+    const hand = hands[0];
+    const g    = hand.gesture;
+    const confirmed = hand.confirmed;
+    const sp   = hand.smoothed;
+
+    // ERASE: fist
+    if (confirmed === 'fist') {
+      if (!this._lastEraseGesture) {
+        this._lastEraseGesture = true;
+        this.drawEngine.eraseAll();
+        this.drawEngine.flashErase();
+        this._mode = 'erasing';
+        this.hud.flashGesture('✊ ERASE');
+      }
+      return;
+    } else {
+      this._lastEraseGesture = false;
+    }
+
+    // UNDO: rock-on
+    if (confirmed === 'rockon') {
+      if (!this._lastRockGesture) {
+        this._lastRockGesture = true;
+        this.drawEngine.undo();
+        this._mode = 'passive';
+        this.hud.flashGesture('🤘 UNDO');
+      }
+      return;
+    } else {
+      this._lastRockGesture = false;
+    }
+
+    // FINALIZE: peace sign finalizes current polygon
+    if (g === 'peace') {
+      if (this._mode === 'drawing' && this.drawEngine.draftPts.length >= MIN_POLY_VERTS) {
+        this.drawEngine.finalizePolygon();
+        this._mode = 'passive';
+        this.hud.flashGesture('✌️ DONE');
+      } else {
+        this._mode = 'passive';
+      }
+      return;
+    }
+
+    // DRAW: point gesture
+    if (g === 'point') {
+      const w = tr.toWorld(sp.x, sp.y);
+      this.drawEngine.addDraftPoint(w.x, w.y);
+      this._mode = 'drawing';
+      return;
+    }
+
+    // OPEN HAND: pan with single hand
+    if (g === 'open') {
+      if (this._mode === 'drawing') {
+        // finalize if we were drawing
+        this.drawEngine.finalizePolygon();
+        this.hud.flashGesture('🖐️ SAVED');
+      }
+      if (!this._panActive) {
+        tr.startPan(sp.x, sp.y);
+        this._panActive = true;
+      } else {
+        tr.updatePan(sp.x, sp.y);
+      }
+      this._mode = 'panning';
+      return;
+    }
+
+    // Otherwise passive
+    if (this._mode === 'drawing') {
+      // auto-finalize when gesture changes
+      this.drawEngine.finalizePolygon();
+      this.hud.flashGesture('✅ SAVED');
+    }
+    this._mode = 'passive';
+  }
+}
+
+// ─────────────────────────────────────────────
+//  BOOTSTRAP
+// ─────────────────────────────────────────────
+const app = new App();
+app.start().catch(console.error);
+
+</script>
+</body>
+</html>
