@@ -1,110 +1,101 @@
-# Handdetector
-Link: https://rishwebb.github.io/Handdetector/
+# GestureBoard — Hand-Controlled Whiteboard
 
-# Neural Hand Tracker / Gesture Interface
+GestureBoard is a real-time, hand-tracking powered whiteboard that lets you **draw, pan, zoom, erase, and manipulate polygons using only gestures**.
 
-A real-time hand tracking and gesture-controlled interaction system built using computer vision and web-based 3D rendering.
-
-This project uses live webcam input to detect human hand landmarks and translates gestures into interactive actions such as building, rotating, grabbing, or triggering visual states in a virtual environment.
+It runs entirely in the browser using **MediaPipe Hands**, an HTML5 `<canvas>` rendering pipeline, and a structured internal architecture optimized for smooth interaction and high performance.
 
 ---
 
-## Features
+## ✨ Features
 
-- Real-time hand tracking using webcam input
-- Accurate detection of hand landmarks and gestures
-- Gesture-based interactions (pinch, fist, open palm, dual-hand actions)
-- Smooth landmark stabilization for reduced jitter
-- Visual HUD and feedback overlays
-- Designed for experimental UI, XR concepts, and human-computer interaction research
+### 🎨 Polygon-Based Drawing
+- Create polygons vertex-by-vertex using finger gestures
+- Snap-to-close detection for clean polygon completion
+- Fill + stroke rendering with dynamic color palettes
+- Undo support
+- Clear all with animated erase flash
 
----
+### ✋ Gesture Controls
 
-## Technology Stack
-
-- MediaPipe Hands (for hand landmark detection)
-- JavaScript (core logic)
-- HTML5 Canvas (gesture visualization & HUD)
-- Three.js (3D rendering and interaction)
-- WebGL (GPU-accelerated graphics)
-
----
-
-## How It Works
-
-1. The webcam captures live video frames.
-2. MediaPipe Hands detects 21 landmarks per hand in real time.
-3. Landmark distances and relative positions are analyzed to identify gestures.
-4. Gestures are mapped to system actions (build, erase, rotate, grab).
-5. Visual feedback is rendered instantly to the screen.
-
-This is **not** a simulation. All interactions are driven by real hand movement.
+| Gesture | Action |
+|----------|--------|
+| ☝️ **Point** | Add polygon vertices |
+| ✌️ **Peace** | Finalize polygon |
+| 🖐️ **Open Hand** | Pan canvas |
+| 🤌 **Pinch (Two Hands)** | Zoom in / out |
+| ✊ **Fist** | Erase all |
+| 🤘 **Rock-On** | Undo last |
 
 ---
 
-## Setup Instructions
+## 🧠 Architecture Overview
 
-1. Clone or download the project files.
-2. Open the main HTML file in a modern browser (Chrome recommended).
-3. Allow camera access when prompted.
-4. Ensure good lighting for best hand detection accuracy.
+GestureBoard is structured into modular managers to isolate responsibilities:
 
-No backend or server is required.
+### `PointerSmoother`
+- Adaptive velocity-based smoothing
+- Resolution-independent movement normalization
+- Prevents jitter while remaining responsive
 
----
+### `TransformMgr`
+- Handles world ↔ screen coordinate mapping
+- Manages pan and zoom state
+- Supports pinch scaling with center anchoring
 
-## Usage Notes
+### `ModeMachine`
+- Explicit state machine
+- Prevents gesture conflicts
+- Valid states:
+  - `passive`
+  - `drawing`
+  - `panning`
+  - `zooming`
+  - `erasing`
 
-- Works best with clear lighting and a visible hand.
-- Designed for desktop or laptop environments with a webcam.
-- Mobile browser support may be limited.
+### `DrawingMgr`
+- Polygon state management
+- Offscreen rendering cache (dirty-flag optimized)
+- Infinite world-aligned grid
+- Batched vertex rendering (single path optimization)
+- Animated erase flash
+- Snap-to-close logic
+- Save to PNG
 
----
-
-## License
-
-**MIT License**
-
-Permission is hereby granted, free of charge, to any person obtaining a copy  
-of this software and associated documentation files (the "Software"), to deal  
-in the Software without restriction, including without limitation the rights  
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell  
-copies of the Software, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all  
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR  
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE  
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER  
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE  
-SOFTWARE.
-
----
-
-## Copyright
-
-© 2026 Rishav Biswas  
-All rights reserved.
-
-Original implementation, gesture logic, interaction design, and system architecture are authored by Rishav Biswas.
-
-If you use this project or build upon it, attribution is appreciated.
+### `GestureMgr`
+- MediaPipe integration
+- Handedness-aware thumb detection
+- Peace vs Point disambiguation via finger spread
+- Hysteresis-based gesture confirmation
+- Watchdog tracking loss recovery
 
 ---
 
-## Disclaimer
+## ⚙️ Performance Optimizations
 
-This project is intended for educational, experimental, and research purposes.  
-It is not designed for medical, safety-critical, or surveillance applications.
+- Offscreen canvas for finalized polygons
+- Dirty-flag redraw system
+- Batched arc rendering for vertex points
+- Line width clamping at extreme zoom
+- Velocity-normalized smoothing
+- Infinite grid aligned to world transform
+- Gesture hysteresis (no flicker mode switching)
+- Tracking watchdog for reliability
 
 ---
 
-## Contact
+## 🖥 UI Components
 
-For collaboration, feedback, or questions, reach out via your preferred platform.
+- Fullscreen drawing canvas
+- Mini live camera preview with overlay
+- Real-time HUD:
+  - Current gesture
+  - Polygon count
+  - Zoom level
+  - FPS
+  - Hand count
+  - Confidence
+- Animated gesture flash overlay
+- Mode badge indicator
+- Bottom floating toolbar
 
-
-# gestureboard
+---
