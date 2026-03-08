@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GestureBoard — Hand-Controlled Whiteboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ─── Loading Screen ─── -->
+  <div id="loading">
+    <div class="ld-title">GESTUREBOARD</div>
+    <div class="ld-sub">Real-Time Hand-Controlled Canvas</div>
+    <div class="ld-track"><div class="ld-fill" id="ldFill"></div></div>
+    <div class="ld-msg" id="ldMsg">Initializing…</div>
+  </div>
+
+  <!-- ─── Gesture Flash Overlay ─── -->
+  <div id="gFlash"></div>
+
+  <!-- ─── Watchdog Warning ─── -->
+  <div id="watchdogWarn">⚠ TRACKING LOST — RECONNECTING…</div>
+
+  <!-- ─── Main Drawing Canvas ─── -->
+  <canvas id="mainCanvas"></canvas>
+
+  <!-- ─── HUD: Top Left ─── -->
+  <div id="hudLeft">
+    <div class="hud-brand">GESTURE<span>BOARD</span></div>
+    <div id="modeBadge">PASSIVE</div>
+    <div class="hud-card">
+      <div class="hud-row">
+        <span class="hud-k">GESTURE</span>
+        <span class="hud-v c-cyan" id="hGest">—</span>
+      </div>
+      <div class="hud-row">
+        <span class="hud-k">POLYGONS</span>
+        <span class="hud-v" id="hPoly">0</span>
+      </div>
+      <div class="hud-row">
+        <span class="hud-k">ZOOM</span>
+        <span class="hud-v c-purple" id="hZoom">100%</span>
+      </div>
+      <div class="hud-row">
+        <span class="hud-k">FPS</span>
+        <span class="hud-v c-cyan" id="hFps">—</span>
+      </div>
+      <div class="hud-row">
+        <span class="hud-k">HANDS</span>
+        <span class="hud-v" id="hHands">0</span>
+      </div>
+      <div class="hud-row">
+        <span class="hud-k">CONF.</span>
+        <span class="hud-v c-yellow" id="hConf">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Gesture Legend: Top Right ─── -->
+  <div id="legend">
+    <div class="legend-head">Gestures</div>
+    <div class="legend-row">
+      <span class="legend-emo">☝️</span>
+      <span class="legend-text"><strong>POINT</strong>Draw polygon vertices</span>
+    </div>
+    <div class="legend-row">
+      <span class="legend-emo">✌️</span>
+      <span class="legend-text"><strong>PEACE</strong>Finalize polygon</span>
+    </div>
+    <div class="legend-row">
+      <span class="legend-emo">🖐️</span>
+      <span class="legend-text"><strong>OPEN HAND</strong>Grab &amp; pan canvas</span>
+    </div>
+    <div class="legend-row">
+      <span class="legend-emo">🤌</span>
+      <span class="legend-text"><strong>PINCH (2H)</strong>Zoom in/out</span>
+    </div>
+    <div class="legend-row">
+      <span class="legend-emo">✊</span>
+      <span class="legend-text"><strong>FIST</strong>Erase all</span>
+    </div>
+    <div class="legend-row">
+      <span class="legend-emo">🤘</span>
+      <span class="legend-text"><strong>ROCK-ON</strong>Undo last</span>
+    </div>
+  </div>
+
+  <!-- ─── Status Bar: Bottom Left ─── -->
+  <div id="statusBar">
+    <div class="s-dot" id="sDot"></div>
+    <span id="sText">INITIALIZING</span>
+  </div>
+
+  <!-- ─── Camera Preview Panel ─── -->
+  <div id="camWrap">
+    <video id="webcam" autoplay muted playsinline></video>
+    <canvas id="camCanvas"></canvas>
+    <div class="cam-badge">LIVE</div>
+  </div>
+
+  <!-- ─── Bottom Toolbar ─── -->
+  <div id="toolbar">
+    <button class="tb-btn danger" onclick="App.eraseAll()">✕ CLEAR</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="App.undo()">↩ UNDO</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="App.resetView()">⊞ RESET VIEW</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="toggleColorCycle()">
+      <div class="tb-dot" id="colorDot" style="background:var(--cyan)"></div>
+      COLOR
+    </button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="App.save()">⬇ SAVE</button>
+  </div>
+
+  <!-- ─── MediaPipe Libraries ─── -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <!-- ─── App Modules (order matters) ─── -->
+  <script src="js/config.js"></script>
+  <script src="js/palette.js"></script>
+  <script src="js/smoother.js"></script>
+  <script src="js/transform.js"></script>
+  <script src="js/mode-machine.js"></script>
+  <script src="js/drawing.js"></script>
+  <script src="js/gesture.js"></script>
+  <script src="js/hud.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>

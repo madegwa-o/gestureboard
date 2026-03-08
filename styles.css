@@ -1,0 +1,505 @@
+/* ══════════════════════════════════════════════
+   GestureBoard — styles.css
+   ══════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne+Mono&family=Syne:wght@400;700;800&display=swap');
+
+/* ─── Reset & Custom Properties ─── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg:       #05050a;
+  --surf:     #0d0d18;
+  --surf2:    #14142a;
+  --border:   rgba(255, 255, 255, 0.07);
+  --cyan:     #00f5d4;
+  --magenta:  #f72585;
+  --yellow:   #ffd60a;
+  --purple:   #7b2fff;
+  --text:     #e8e8f0;
+  --muted:    #55556a;
+  --mono:     'Syne Mono', monospace;
+  --sans:     'Space Grotesk', sans-serif;
+  --display:  'Syne', sans-serif;
+
+  --cyan-glow: 0 0 20px rgba(0, 245, 212, 0.35);
+  --mag-glow:  0 0 20px rgba(247, 37, 133, 0.35);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  user-select: none;
+}
+
+
+/* ══════════════════════════════════════════════
+   CANVAS
+   ══════════════════════════════════════════════ */
+#mainCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: none;
+  z-index: 1;
+}
+
+
+/* ══════════════════════════════════════════════
+   CAMERA PANEL
+   ══════════════════════════════════════════════ */
+#camWrap {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 20;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--cyan-glow), 0 8px 40px rgba(0, 0, 0, 0.6);
+  transition: opacity 0.3s ease;
+  background: #000;
+}
+
+#camWrap:hover { opacity: 0.6; }
+
+#camWrap video {
+  display: block;
+  width: 220px;
+  height: 165px;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+#camCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 220px;
+  height: 165px;
+  transform: scaleX(-1);
+  pointer-events: none;
+}
+
+.cam-badge {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cam-badge::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cyan);
+  animation: livepulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 8px var(--cyan);
+}
+
+@keyframes livepulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.6); }
+}
+
+
+/* ══════════════════════════════════════════════
+   HUD — LEFT PANEL
+   ══════════════════════════════════════════════ */
+#hudLeft {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 20;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hud-brand {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+  text-shadow: 0 0 30px rgba(0, 245, 212, 0.5);
+  line-height: 1;
+}
+
+.hud-brand span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.hud-card {
+  background: rgba(5, 5, 10, 0.82);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--cyan);
+  backdrop-filter: blur(12px);
+  padding: 12px 16px;
+  border-radius: 6px;
+  min-width: 200px;
+}
+
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  gap: 12px;
+}
+
+.hud-k {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hud-v {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+
+.hud-v.c-cyan    { color: var(--cyan); }
+.hud-v.c-yellow  { color: var(--yellow); }
+.hud-v.c-magenta { color: var(--magenta); }
+.hud-v.c-purple  { color: #aa88ff; }
+
+
+/* ─── Mode Badge ─── */
+#modeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  background: rgba(0, 245, 212, 0.08);
+  border: 1px solid rgba(0, 245, 212, 0.2);
+  border-radius: 20px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  transition: all 0.25s;
+}
+
+#modeBadge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+}
+
+#modeBadge.mode-draw {
+  color: var(--yellow);
+  border-color: rgba(255, 214, 10, 0.3);
+  background: rgba(255, 214, 10, 0.06);
+}
+#modeBadge.mode-draw::before  { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+
+#modeBadge.mode-erase {
+  color: var(--magenta);
+  border-color: rgba(247, 37, 133, 0.3);
+  background: rgba(247, 37, 133, 0.06);
+}
+#modeBadge.mode-erase::before { background: var(--magenta); box-shadow: 0 0 8px var(--magenta); }
+
+#modeBadge.mode-pan {
+  color: #aa88ff;
+  border-color: rgba(170, 136, 255, 0.3);
+  background: rgba(170, 136, 255, 0.06);
+}
+#modeBadge.mode-pan::before   { background: #aa88ff; box-shadow: 0 0 8px #aa88ff; }
+
+
+/* ══════════════════════════════════════════════
+   GESTURE LEGEND — RIGHT PANEL
+   ══════════════════════════════════════════════ */
+#legend {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 20;
+  pointer-events: none;
+  background: rgba(5, 5, 10, 0.82);
+  border: 1px solid var(--border);
+  border-right: 2px solid var(--cyan);
+  backdrop-filter: blur(12px);
+  padding: 14px 18px;
+  border-radius: 6px;
+  min-width: 210px;
+}
+
+.legend-head {
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 10px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.legend-row:last-child { border: none; }
+
+.legend-emo {
+  font-size: 15px;
+  width: 22px;
+  text-align: center;
+}
+
+.legend-text {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.legend-text strong {
+  color: var(--text);
+  display: block;
+  margin-bottom: 1px;
+}
+
+
+/* ══════════════════════════════════════════════
+   GESTURE FLASH OVERLAY
+   ══════════════════════════════════════════════ */
+#gFlash {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 30;
+  transform: translate(-50%, -50%) scale(0.8);
+  font-family: var(--display);
+  font-size: 72px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  text-shadow: 0 0 80px rgba(247, 37, 133, 0.6);
+  color: white;
+  transition: opacity 0.12s, transform 0.12s;
+}
+
+#gFlash.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+
+/* ══════════════════════════════════════════════
+   STATUS BAR — BOTTOM LEFT
+   ══════════════════════════════════════════════ */
+#statusBar {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 20;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.s-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.s-dot.on {
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+  animation: livepulse 2s infinite;
+}
+
+
+/* ══════════════════════════════════════════════
+   WATCHDOG WARNING
+   ══════════════════════════════════════════════ */
+#watchdogWarn {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 40;
+  transform: translate(-50%, -50%);
+  background: rgba(247, 37, 133, 0.12);
+  border: 1px solid rgba(247, 37, 133, 0.4);
+  backdrop-filter: blur(12px);
+  padding: 20px 32px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--magenta);
+  text-align: center;
+  display: none;
+}
+
+#watchdogWarn.visible { display: block; }
+
+
+/* ══════════════════════════════════════════════
+   LOADING SCREEN
+   ══════════════════════════════════════════════ */
+#loading {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.ld-title {
+  font-family: var(--display);
+  font-size: 58px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  color: var(--cyan);
+  text-shadow: 0 0 60px rgba(0, 245, 212, 0.4);
+}
+
+.ld-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: var(--muted);
+}
+
+.ld-track {
+  width: 280px;
+  height: 2px;
+  background: var(--border);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.ld-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--purple));
+  width: 0;
+  transition: width 0.4s;
+  box-shadow: 0 0 12px var(--cyan);
+}
+
+.ld-msg {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  min-height: 14px;
+}
+
+
+/* ══════════════════════════════════════════════
+   BOTTOM TOOLBAR
+   ══════════════════════════════════════════════ */
+#toolbar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: rgba(5, 5, 10, 0.85);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  padding: 10px 16px;
+  border-radius: 50px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+.tb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 30px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tb-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.tb-btn.active {
+  background: rgba(0, 245, 212, 0.1);
+  color: var(--cyan);
+  border-color: rgba(0, 245, 212, 0.3);
+}
+
+.tb-btn.danger:hover {
+  background: rgba(247, 37, 133, 0.1);
+  color: var(--magenta);
+  border-color: rgba(247, 37, 133, 0.3);
+}
+
+.tb-sep {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+}
+
+.tb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
