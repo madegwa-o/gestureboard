@@ -22,3 +22,9 @@ Thumbs.db
 # python cache (if using ML scripts)
 __pycache__/
 *.pyc
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
