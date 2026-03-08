@@ -117,7 +117,7 @@ class DrawingMgr {
 
     // 1. Background fill
     ctx.resetTransform();
-    ctx.fillStyle = '#05050a';
+    ctx.fillStyle = '#0e0e0e';
     ctx.fillRect(0, 0, W, H);
 
     // 2. World-aligned infinite grid
@@ -302,7 +302,7 @@ class DrawingMgr {
     const offY = ((ty % step) + step) % step;
 
     ctx.resetTransform();
-    ctx.strokeStyle = 'rgba(25,25,50,0.7)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
     ctx.lineWidth   = 0.5;
 
     ctx.beginPath();
@@ -317,7 +317,7 @@ class DrawingMgr {
     ctx.stroke();
 
     // Intersection dots — batched into a single path for performance
-    ctx.fillStyle = 'rgba(40,40,80,0.6)';
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
     ctx.beginPath();
     for (let x = offX - step; x < W + step; x += step) {
       for (let y = offY - step; y < H + step; y += step) {

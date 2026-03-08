@@ -70,7 +70,7 @@
     </div>
     <div class="legend-row">
       <span class="legend-emo">🖐️</span>
-      <span class="legend-text"><strong>OPEN HAND</strong>Grab &amp; pan canvas</span>
+      <span class="legend-text"><strong>OPEN HAND</strong>Pan canvas</span>
     </div>
     <div class="legend-row">
       <span class="legend-emo">🤌</span>
@@ -92,12 +92,29 @@
     <span id="sText">INITIALIZING</span>
   </div>
 
-  <!-- ─── Camera Preview Panel ─── -->
-  <div id="camWrap">
-    <video id="webcam" autoplay muted playsinline></video>
-    <canvas id="camCanvas"></canvas>
-    <div class="cam-badge">LIVE</div>
-  </div>
+ <!-- ─── Camera Preview Panel ─── -->
+<div id="camWrap">
+  <video id="webcam" autoplay muted playsinline></video>
+  <canvas id="camCanvas"></canvas>
+  <div class="cam-badge">LIVE</div>
+  <button class="cam-eye" id="camEye" onclick="toggleCamVideo()" title="Toggle video">👁</button>
+</div>
+
+<script>
+  function toggleCamVideo() {
+    const video = document.getElementById('webcam');
+    const btn   = document.getElementById('camEye');
+    const hidden = video.style.opacity === '0';
+    video.style.opacity = hidden ? '1' : '0';
+    btn.classList.toggle('cam-eye--off', !hidden);
+  }
+
+  // Hide video by default on load
+  window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('webcam').style.opacity = '0';
+    document.getElementById('camEye').classList.add('cam-eye--off');
+  });
+</script>
 
   <!-- ─── Bottom Toolbar ─── -->
   <div id="toolbar">
