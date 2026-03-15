@@ -191,7 +191,12 @@ const App = (() => {
     }
 
     // DRAW — pointing finger
-    if (g === 'point') {
+    // Enter drawing with the confirmed gesture to reduce accidental starts,
+    // then keep drawing while either raw or confirmed stays on point.
+    const drawActive = mode.is('drawing')
+      ? (g === 'point' || gc === 'point')
+      : (gc === 'point');
+    if (drawActive) {
       const w = tr.toWorld(sp.x, sp.y);
       drawing.addDraftPt(w.x, w.y);
       mode.to('drawing');
