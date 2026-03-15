@@ -6,8 +6,8 @@
 
 const Config = Object.freeze({
   // ─── Pointer smoothing ───────────────────────────────────
-  SMOOTH_ALPHA:      0.22,   // base lag factor (0 = fully lagged, 1 = raw)
-  SMOOTH_ALPHA_FAST: 0.5,    // lag factor when cursor moves fast
+  SMOOTH_ALPHA:      0.16,   // base lag factor (lower = smoother, higher = snappier)
+  SMOOTH_ALPHA_FAST: 0.38,   // lag factor when cursor moves fast
 
   // ─── Gesture confirmation ────────────────────────────────
   HOLD_FRAMES:  5,   // consecutive frames needed to confirm a gesture
@@ -15,7 +15,7 @@ const Config = Object.freeze({
 
   // ─── Drawing ─────────────────────────────────────────────
   MIN_VERTS:  3,    // minimum vertices to close a polygon
-  MIN_MOVE:   4,    // minimum world-space px between draft points
+  MIN_MOVE:   6,    // minimum world-space px between draft points
 
   // ─── Viewport ────────────────────────────────────────────
   ZOOM_MIN: 0.15,
@@ -23,7 +23,7 @@ const Config = Object.freeze({
 
   // ─── MediaPipe confidence ────────────────────────────────
   DETECT_CONF: 0.72,
-  TRACK_CONF:  0.70,
+  TRACK_CONF:  0.78,
 
   // ─── Gesture thresholds ──────────────────────────────────
   PINCH_DIST:  0.065,  // normalized distance for pinch detection
