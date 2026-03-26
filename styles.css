@@ -553,6 +553,11 @@ body {
   color: var(--accent);
 }
 
+.tb-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .tb-btn.danger:hover {
   background: rgba(176, 112, 112, 0.08);
   color: var(--erase);
