@@ -16,6 +16,9 @@ const Config = Object.freeze({
   // ─── Drawing ─────────────────────────────────────────────
   MIN_VERTS:  3,    // minimum vertices to close a polygon
   MIN_MOVE:   6,    // minimum world-space px between draft points
+  ANGLE_SNAP_DEG: 15, // architect mode angular increment for new draft points
+  SHAPE_CONFIDENCE_MIN: 0.55, // minimum confidence needed to run smart shape fitting
+  CIRCLE_SEGMENTS: 36, // segments used to render fitted circles
 
   // ─── Viewport ────────────────────────────────────────────
   ZOOM_MIN: 0.15,

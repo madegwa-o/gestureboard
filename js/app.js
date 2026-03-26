@@ -29,6 +29,8 @@ const App = (() => {
   let cursorSS     = null;   // screen-space cursor position (or null)
   let pinchActive  = false;
   let panActive    = false;
+  let smartShapesEnabled = false;
+  let architectModeEnabled = false;
 
   // Per-gesture one-shot debounce flags (prevent repeated triggers
   // while a confirmed gesture is held).
@@ -40,6 +42,8 @@ const App = (() => {
 
   // Seed the canvas with sample shapes on first load
   drawing.seedDemoPolygons();
+  drawing.setSmartShapesEnabled(false);
+  drawing.setArchitectModeEnabled(false);
 
   // ══════════════════════════════════════════════
   //  ANIMATION LOOP
@@ -140,7 +144,7 @@ const App = (() => {
 
     // ── No hands detected ───────────────────────────────
     if (count === 0) {
-      if (mode.is('drawing')) drawing.finalizeDraft();
+      if (mode.is('drawing')) drawing.finalizeDraft({ source: 'auto', confidence: lastHandData.confidence || 0 });
       mode.to('passive');
       lastConfirmedErase = false;
       lastConfirmedRock  = false;
@@ -183,7 +187,7 @@ const App = (() => {
     // FINALIZE — peace sign
     if (g === 'peace') {
       if (mode.is('drawing') && drawing.draft.length >= 3) {
-        drawing.finalizeDraft();
+        drawing.finalizeDraft({ source: 'peace', confidence: lastHandData.confidence || 0 });
         hud.flashGesture('✌️ DONE');
       }
       mode.to('passive');
@@ -208,7 +212,7 @@ const App = (() => {
     // part of the hand and doesn't jump around like fingertips do.
     if (g === 'open') {
       if (mode.is('drawing')) {
-        drawing.finalizeDraft();
+        drawing.finalizeDraft({ source: 'auto', confidence: lastHandData.confidence || 0 });
         hud.flashGesture('🖐️ SAVED');
       }
       const wx = h.wrist.x;
@@ -229,7 +233,7 @@ const App = (() => {
 
     // Unknown / transitional gesture — finalize any open draft and go passive
     if (mode.is('drawing')) {
-      drawing.finalizeDraft();
+      drawing.finalizeDraft({ source: 'auto', confidence: lastHandData.confidence || 0 });
       hud.flashGesture('✅ SAVED');
     }
     mode.to('passive');
@@ -295,6 +299,38 @@ const App = (() => {
 
     resetView() {
       drawing.transform.reset();
+    },
+
+    toggleShapeIntelligence() {
+      smartShapesEnabled = !smartShapesEnabled;
+      drawing.setSmartShapesEnabled(smartShapesEnabled);
+      if (!smartShapesEnabled && architectModeEnabled) {
+        architectModeEnabled = false;
+        drawing.setArchitectModeEnabled(false);
+      }
+      const btn = document.getElementById('shapeBtn');
+      if (btn) {
+        btn.classList.toggle('active', smartShapesEnabled);
+        btn.textContent = smartShapesEnabled ? '🧠 SHAPES ON' : '🧠 SHAPES OFF';
+      }
+      const archBtn = document.getElementById('archBtn');
+      if (archBtn) {
+        archBtn.disabled = !smartShapesEnabled;
+        archBtn.classList.toggle('active', smartShapesEnabled && architectModeEnabled);
+      }
+      hud.flashGesture(smartShapesEnabled ? '🧠 SMART SHAPES' : '🧠 RAW SHAPES');
+    },
+
+    toggleArchitectMode() {
+      if (!smartShapesEnabled) return;
+      architectModeEnabled = !architectModeEnabled;
+      drawing.setArchitectModeEnabled(architectModeEnabled);
+      const btn = document.getElementById('archBtn');
+      if (btn) {
+        btn.classList.toggle('active', architectModeEnabled);
+        btn.textContent = architectModeEnabled ? '📐 ARCH 15° ON' : '📐 ARCH 15° OFF';
+      }
+      hud.flashGesture(architectModeEnabled ? '📐 ARCH MODE' : '📐 FREE ANGLES');
     },
 
     /**
