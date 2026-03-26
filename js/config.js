@@ -19,6 +19,7 @@ const Config = Object.freeze({
   ANGLE_SNAP_DEG: 15, // architect mode angular increment for new draft points
   SHAPE_CONFIDENCE_MIN: 0.55, // minimum confidence needed to run smart shape fitting
   CIRCLE_SEGMENTS: 36, // segments used to render fitted circles
+  LINE_SNAP_MAX_ERR: 10, // max average px error to snap a rough stroke into a straight line
 
   // ─── Viewport ────────────────────────────────────────────
   ZOOM_MIN: 0.15,

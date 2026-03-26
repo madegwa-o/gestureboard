@@ -186,7 +186,10 @@ const App = (() => {
 
     // FINALIZE — peace sign
     if (g === 'peace') {
-      if (mode.is('drawing') && drawing.draft.length >= 3) {
+      const conf = lastHandData.confidence || 0;
+      const canUseSmartShape = smartShapesEnabled && conf >= Config.SHAPE_CONFIDENCE_MIN;
+      const minFinalizePts = canUseSmartShape ? 2 : 3;
+      if (mode.is('drawing') && drawing.draft.length >= minFinalizePts) {
         drawing.finalizeDraft({ source: 'peace', confidence: lastHandData.confidence || 0 });
         hud.flashGesture('✌️ DONE');
       }
