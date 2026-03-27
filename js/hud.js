@@ -19,6 +19,7 @@ class HudMgr {
     this._fps    = document.getElementById('hFps');
     this._hands  = document.getElementById('hHands');
     this._conf   = document.getElementById('hConf');
+    this._users  = document.getElementById('hUsers');
     this._flash  = document.getElementById('gFlash');
     this._sdot   = document.getElementById('sDot');
     this._stext  = document.getElementById('sText');
@@ -43,7 +44,7 @@ class HudMgr {
    * @param {number} params.hands       Number of hands detected
    * @param {number} params.confidence  Tracking confidence 0–1
    */
-  update({ mode, gesture, polyCount, zoom, fps, hands, confidence }) {
+  update({ mode, gesture, polyCount, zoom, fps, hands, confidence, users }) {
     // Mode badge — also switches CSS class for colour theming
     this._badge.textContent = mode;
     this._badge.className   = '';
@@ -57,6 +58,7 @@ class HudMgr {
     this._fps.textContent   = fps;
     this._hands.textContent = hands;
     this._conf.textContent  = Math.round(confidence * 100) + '%';
+    this._users.textContent = users;
   }
 
   // ══════════════════════════════════════════════

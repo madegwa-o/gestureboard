@@ -33,6 +33,7 @@ const App = (() => {
   let smartShapesEnabled = false;
   let architectModeEnabled = false;
   let applyingRemoteState = false;
+  let connectedUsers = 0;
 
   // Per-gesture one-shot debounce flags (prevent repeated triggers
   // while a confirmed gesture is held).
@@ -75,6 +76,7 @@ const App = (() => {
       fps,
       hands:      lastHandData.count,
       confidence: lastHandData.confidence || 0,
+      users:      connectedUsers,
     });
 
     requestAnimationFrame(loop);
@@ -285,6 +287,9 @@ const App = (() => {
 
       collab.onStatus = ({ connected, message }) => {
         hud.setStatus(message, connected);
+      };
+      collab.onPresence = users => {
+        connectedUsers = users;
       };
 
       collab.connect();
