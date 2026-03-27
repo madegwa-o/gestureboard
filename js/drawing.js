@@ -71,22 +71,24 @@ class DrawingMgr {
 
   /** Close the draft into a finalized polygon (if enough vertices). */
   finalizeDraft(meta = {}) {
-    if (this.draft.length >= Config.MIN_VERTS) {
+    const source = meta.source || 'generic';
+    const confidence = meta.confidence ?? 0;
+    const smartShapeEligible = this._smartShapesEnabled
+      && source === 'peace'
+      && confidence >= Config.SHAPE_CONFIDENCE_MIN;
+    const minVerts = smartShapeEligible ? 2 : Config.MIN_VERTS;
+
+    if (this.draft.length >= minVerts) {
       this._saveUndo();
       const p = currentPalette();
-      const source = meta.source || 'generic';
-      const confidence = meta.confidence ?? 0;
-      const smartShapeEligible = this._smartShapesEnabled
-        && source === 'peace'
-        && confidence >= Config.SHAPE_CONFIDENCE_MIN;
-      const finalPts = smartShapeEligible
+      const shaped = smartShapeEligible
         ? this._fitSmartShape(this.draft)
-        : this._smoothClosed(this.draft);
+        : { pts: this._smoothClosed(this.draft), open: false, noFill: false };
       this.polygons.push({
-        pts:    finalPts,
+        pts:    shaped.pts,
         stroke: p.stroke,
-        fill:   p.fill,
-        open:   false,
+        fill:   shaped.noFill ? 'rgba(0,0,0,0)' : p.fill,
+        open:   shaped.open,
       });
     }
     this.draft       = [];
@@ -427,16 +429,58 @@ class DrawingMgr {
     const closed = this._prepareClosed(rawPts);
     const simplified = this._simplifyRDP(closed, 14);
 
+    const line = this._fitLine(closed);
+    if (line) return line;
+
     const tri = this._fitTriangle(simplified);
-    if (tri) return tri;
+    if (tri) return { pts: tri, open: false, noFill: false };
 
     const rect = this._fitRectangle(simplified);
-    if (rect) return rect;
+    if (rect) return { pts: rect, open: false, noFill: false };
 
     const circle = this._fitCircle(closed);
-    if (circle) return circle;
+    if (circle) return { pts: circle, open: false, noFill: false };
 
-    return this._smoothClosed(closed);
+    return { pts: this._smoothClosed(closed), open: false, noFill: false };
+  }
+
+  _fitLine(closed) {
+    const pts = closed.slice(0, -1);
+    if (pts.length < 2) return null;
+
+    let a = pts[0];
+    let b = pts[pts.length - 1];
+    let maxD = -1;
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        const d = Math.hypot(pts[j].x - pts[i].x, pts[j].y - pts[i].y);
+        if (d > maxD) {
+          maxD = d;
+          a = pts[i];
+          b = pts[j];
+        }
+      }
+    }
+    if (maxD < Config.MIN_MOVE * 3) return null;
+
+    const vx = b.x - a.x;
+    const vy = b.y - a.y;
+    const len = Math.hypot(vx, vy);
+    if (!len) return null;
+
+    const avgErr = pts.reduce((acc, p) => {
+      const wx = p.x - a.x;
+      const wy = p.y - a.y;
+      const area2 = Math.abs(vx * wy - vy * wx);
+      return acc + (area2 / len);
+    }, 0) / pts.length;
+
+    if (avgErr > Config.LINE_SNAP_MAX_ERR) return null;
+    return {
+      pts: [{ x: a.x, y: a.y }, { x: b.x, y: b.y }],
+      open: true,
+      noFill: true,
+    };
   }
 
   _prepareClosed(pts) {
