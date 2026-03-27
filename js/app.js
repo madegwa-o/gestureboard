@@ -34,12 +34,21 @@ const App = (() => {
   // while a confirmed gesture is held).
   let lastConfirmedErase = false;
   let lastConfirmedRock  = false;
+  let shapeAssistEnabled = true;
 
   // FPS counter
   let fps = 0, fpsFrames = 0, fpsLast = performance.now();
 
   // Seed the canvas with sample shapes on first load
   drawing.seedDemoPolygons();
+  drawing.setEnhancePolygonDetection(shapeAssistEnabled);
+
+  function syncShapeAssistButton() {
+    const btn = document.getElementById('shapeAssistBtn');
+    if (!btn) return;
+    btn.classList.toggle('active', shapeAssistEnabled);
+    btn.textContent = shapeAssistEnabled ? '⬡ SHAPE ASSIST ON' : '⬡ SHAPE ASSIST OFF';
+  }
 
   // ══════════════════════════════════════════════
   //  ANIMATION LOOP
@@ -72,6 +81,7 @@ const App = (() => {
     });
 
     requestAnimationFrame(loop);
+    syncShapeAssistButton();
   }
 
   /** Build a human-readable gesture label for the HUD stats card. */
@@ -315,6 +325,13 @@ const App = (() => {
       link.download   = `gestureboard-${Date.now()}.png`;
       link.href       = exportCanvas.toDataURL('image/png');
       link.click();
+    },
+
+    toggleShapeAssist() {
+      shapeAssistEnabled = !shapeAssistEnabled;
+      drawing.setEnhancePolygonDetection(shapeAssistEnabled);
+      syncShapeAssistButton();
+      hud.flashGesture(shapeAssistEnabled ? '⬡ ASSIST ON' : '⬡ ASSIST OFF');
     },
   };
 

@@ -17,6 +17,13 @@ const Config = Object.freeze({
   MIN_VERTS:  3,    // minimum vertices to close a polygon
   MIN_MOVE:   6,    // minimum world-space px between draft points
 
+  // ─── Shape assist (enhanced polygon detection) ───────────
+  SHAPE_CIRCLE_MIN_PTS:     12,
+  SHAPE_CIRCLE_MAX_CV:      0.27, // radius std/mean threshold for circle-fit
+  SHAPE_CIRCLE_CLOSE_RATIO: 0.75, // max endpoint gap ratio vs avg radius
+  SHAPE_ARROW_MIN_PTS:      7,
+  SHAPE_ARROW_MIN_LEN:      70,
+
   // ─── Viewport ────────────────────────────────────────────
   ZOOM_MIN: 0.15,
   ZOOM_MAX: 12,

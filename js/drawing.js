@@ -24,6 +24,7 @@ class DrawingMgr {
     this.draft     = [];   // current in-progress vertex list
     this.inDraft   = false;
     this.undoStack = [];
+    this.enhancePolygonDetection = true;
 
     // ─── Visual effect state ────────────────────────────────
     this._eraseFlash = null;   // { startTime, duration }
@@ -57,11 +58,14 @@ class DrawingMgr {
     if (this.draft.length >= Config.MIN_VERTS) {
       this._saveUndo();
       const p = currentPalette();
+      const shape = this.enhancePolygonDetection
+        ? this._enhanceDraftShape(this.draft)
+        : { pts: [...this.draft], open: true, fill: p.fill };
       this.polygons.push({
-        pts:    [...this.draft],
+        pts:    shape.pts,
         stroke: p.stroke,
-        fill:   p.fill,
-        open:   true,   // never auto-close the path
+        fill:   shape.fill,
+        open:   shape.open,   // never auto-close the path unless shape detection closes it
       });
     }
     this.draft       = [];
@@ -74,6 +78,11 @@ class DrawingMgr {
     this.draft       = [];
     this.inDraft     = false;
     this._snapActive = false;
+  }
+
+  /** Enable/disable shape assistance (circle + arrow redrawing). */
+  setEnhancePolygonDetection(enabled) {
+    this.enhancePolygonDetection = Boolean(enabled);
   }
 
   // ══════════════════════════════════════════════
@@ -447,5 +456,99 @@ class DrawingMgr {
     ctx.fill();
 
     ctx.restore();
+  }
+
+  // ─── Shape assist ────────────────────────────────────────
+
+  _enhanceDraftShape(rawPts) {
+    const pts = rawPts.map(p => ({ x: p.x, y: p.y }));
+    if (this._looksLikeCircle(pts)) {
+      return this._buildCircleFromStroke(pts);
+    }
+    const arrow = this._buildArrowFromStroke(pts);
+    if (arrow) return arrow;
+    return { pts, open: true, fill: currentPalette().fill };
+  }
+
+  _looksLikeCircle(pts) {
+    if (pts.length < Config.SHAPE_CIRCLE_MIN_PTS) return false;
+    const center = pts.reduce((acc, p) => {
+      acc.x += p.x; acc.y += p.y; return acc;
+    }, { x: 0, y: 0 });
+    center.x /= pts.length;
+    center.y /= pts.length;
+
+    const radii = pts.map(p => Math.hypot(p.x - center.x, p.y - center.y));
+    const meanR = radii.reduce((a, r) => a + r, 0) / radii.length;
+    if (meanR < 8) return false;
+    const variance = radii.reduce((a, r) => a + (r - meanR) ** 2, 0) / radii.length;
+    const cv = Math.sqrt(variance) / meanR;
+    if (cv > Config.SHAPE_CIRCLE_MAX_CV) return false;
+
+    const gap = Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y);
+    return gap <= meanR * Config.SHAPE_CIRCLE_CLOSE_RATIO;
+  }
+
+  _buildCircleFromStroke(pts) {
+    const center = pts.reduce((acc, p) => {
+      acc.x += p.x; acc.y += p.y; return acc;
+    }, { x: 0, y: 0 });
+    center.x /= pts.length;
+    center.y /= pts.length;
+
+    const radius = pts.reduce((a, p) => a + Math.hypot(p.x - center.x, p.y - center.y), 0) / pts.length;
+    const sampleCount = 36;
+    const circlePts = [];
+    for (let i = 0; i < sampleCount; i++) {
+      const t = (i / sampleCount) * Math.PI * 2;
+      circlePts.push({
+        x: center.x + Math.cos(t) * radius,
+        y: center.y + Math.sin(t) * radius,
+      });
+    }
+    return { pts: circlePts, open: false, fill: currentPalette().fill };
+  }
+
+  _buildArrowFromStroke(pts) {
+    if (pts.length < Config.SHAPE_ARROW_MIN_PTS) return null;
+    const start = pts[0];
+    const end = pts[pts.length - 1];
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const len = Math.hypot(dx, dy);
+    if (len < Config.SHAPE_ARROW_MIN_LEN) return null;
+
+    // Keep arrow detection conservative to avoid converting random scribbles.
+    const pathLen = this._polylineLength(pts);
+    if (pathLen < len * 1.1 || pathLen > len * 2.3) return null;
+
+    const tail = start;
+    const tip  = end;
+    const ux = dx / len;
+    const uy = dy / len;
+    const nx = -uy;
+    const ny = ux;
+
+    const headLength = Math.min(Math.max(len * 0.2, 16), 42);
+    const headWidth  = headLength * 0.65;
+    const baseX = tip.x - ux * headLength;
+    const baseY = tip.y - uy * headLength;
+
+    const wingL = { x: baseX + nx * headWidth * 0.5, y: baseY + ny * headWidth * 0.5 };
+    const wingR = { x: baseX - nx * headWidth * 0.5, y: baseY - ny * headWidth * 0.5 };
+
+    return {
+      pts: [tail, tip, wingL, tip, wingR],
+      open: true,
+      fill: 'rgba(0,0,0,0)',
+    };
+  }
+
+  _polylineLength(pts) {
+    let length = 0;
+    for (let i = 1; i < pts.length; i++) {
+      length += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    }
+    return length;
   }
 }
