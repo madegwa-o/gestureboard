@@ -58,9 +58,22 @@ function broadcast(message, excludeSocket = null) {
   }
 }
 
+function openClientCount() {
+  let count = 0;
+  for (const client of wss.clients) {
+    if (client.readyState === 1) count++;
+  }
+  return count;
+}
+
+function broadcastUserCount() {
+  broadcast({ type: 'presence', users: openClientCount() });
+}
+
 wss.on('connection', (socket) => {
   const clientId = `u${nextClientId++}`;
   socket.send(JSON.stringify({ type: 'welcome', clientId }));
+  broadcastUserCount();
 
   if (sharedState) {
     socket.send(JSON.stringify({ type: 'state', state: sharedState }));
@@ -85,6 +98,10 @@ wss.on('connection', (socket) => {
       sharedState = message.state;
       broadcast({ type: 'state', state: sharedState }, socket);
     }
+  });
+
+  socket.on('close', () => {
+    broadcastUserCount();
   });
 });
 

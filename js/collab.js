@@ -6,9 +6,10 @@
 'use strict';
 
 class CollabMgr {
-  constructor({ onState, onStatus } = {}) {
+  constructor({ onState, onStatus, onPresence } = {}) {
     this.onState = typeof onState === 'function' ? onState : () => {};
     this.onStatus = typeof onStatus === 'function' ? onStatus : () => {};
+    this.onPresence = typeof onPresence === 'function' ? onPresence : () => {};
 
     this.socket = null;
     this.clientId = null;
@@ -42,16 +43,23 @@ class CollabMgr {
 
       if (message.type === 'state' && message.state) {
         this.onState(message.state);
+        return;
+      }
+
+      if (message.type === 'presence') {
+        this.onPresence(Number(message.users) || 0);
       }
     });
 
     this.socket.addEventListener('close', () => {
       this.onStatus({ connected: false, message: 'COLLAB OFFLINE' });
+      this.onPresence(0);
       this._scheduleReconnect(url);
     });
 
     this.socket.addEventListener('error', () => {
       this.onStatus({ connected: false, message: 'COLLAB ERROR' });
+      this.onPresence(0);
     });
   }
 
