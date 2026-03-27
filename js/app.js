@@ -23,6 +23,7 @@ const App = (() => {
   const drawing = new DrawingMgr(document.getElementById('mainCanvas'));
   const hud     = new HudMgr();
   const mode    = new ModeMachine();
+  const collab  = new CollabMgr();
 
   // ─── Runtime state ───────────────────────────────────────
   let lastHandData = { hands: [], count: 0, confidence: 0 };
@@ -31,6 +32,7 @@ const App = (() => {
   let panActive    = false;
   let smartShapesEnabled = false;
   let architectModeEnabled = false;
+  let applyingRemoteState = false;
 
   // Per-gesture one-shot debounce flags (prevent repeated triggers
   // while a confirmed gesture is held).
@@ -266,6 +268,27 @@ const App = (() => {
     try {
       await gestureMgr.init(onProgress);
       hud.setStatus('TRACKING ACTIVE', true);
+
+      drawing.onStateChange(state => {
+        if (applyingRemoteState) return;
+        collab.publishState(state);
+      });
+
+      collab.onState = state => {
+        applyingRemoteState = true;
+        drawing.importState(state);
+        smartShapesEnabled = drawing.smartShapesEnabled;
+        architectModeEnabled = drawing.architectModeEnabled;
+        syncToolbarState();
+        applyingRemoteState = false;
+      };
+
+      collab.onStatus = ({ connected, message }) => {
+        hud.setStatus(message, connected);
+      };
+
+      collab.connect();
+
     } catch (err) {
       console.error(err);
       hud.setStatus('CAMERA ERROR', false);
@@ -280,6 +303,22 @@ const App = (() => {
     setTimeout(() => { ld.style.display = 'none'; }, 750);
 
     requestAnimationFrame(loop);
+  }
+
+
+  function syncToolbarState() {
+    const shapeBtn = document.getElementById('shapeBtn');
+    if (shapeBtn) {
+      shapeBtn.classList.toggle('active', smartShapesEnabled);
+      shapeBtn.textContent = smartShapesEnabled ? '🧠 SHAPES ON' : '🧠 SHAPES OFF';
+    }
+
+    const archBtn = document.getElementById('archBtn');
+    if (archBtn) {
+      archBtn.disabled = !smartShapesEnabled;
+      archBtn.classList.toggle('active', smartShapesEnabled && architectModeEnabled);
+      archBtn.textContent = architectModeEnabled ? '📐 ARCH 15° ON' : '📐 ARCH 15° OFF';
+    }
   }
 
   // ══════════════════════════════════════════════
@@ -311,16 +350,8 @@ const App = (() => {
         architectModeEnabled = false;
         drawing.setArchitectModeEnabled(false);
       }
-      const btn = document.getElementById('shapeBtn');
-      if (btn) {
-        btn.classList.toggle('active', smartShapesEnabled);
-        btn.textContent = smartShapesEnabled ? '🧠 SHAPES ON' : '🧠 SHAPES OFF';
-      }
-      const archBtn = document.getElementById('archBtn');
-      if (archBtn) {
-        archBtn.disabled = !smartShapesEnabled;
-        archBtn.classList.toggle('active', smartShapesEnabled && architectModeEnabled);
-      }
+      syncToolbarState();
+      collab.publishState(drawing.exportState());
       hud.flashGesture(smartShapesEnabled ? '🧠 SMART SHAPES' : '🧠 RAW SHAPES');
     },
 
@@ -328,11 +359,8 @@ const App = (() => {
       if (!smartShapesEnabled) return;
       architectModeEnabled = !architectModeEnabled;
       drawing.setArchitectModeEnabled(architectModeEnabled);
-      const btn = document.getElementById('archBtn');
-      if (btn) {
-        btn.classList.toggle('active', architectModeEnabled);
-        btn.textContent = architectModeEnabled ? '📐 ARCH 15° ON' : '📐 ARCH 15° OFF';
-      }
+      syncToolbarState();
+      collab.publishState(drawing.exportState());
       hud.flashGesture(architectModeEnabled ? '📐 ARCH MODE' : '📐 FREE ANGLES');
     },
 

@@ -30,6 +30,7 @@ class DrawingMgr {
     this._snapActive = false;  // true when cursor is near draft origin
     this._smartShapesEnabled = false;
     this._architectModeEnabled = false;
+    this._onStateChange = null;
 
     this._resize();
     window.addEventListener('resize', () => this._resize());
@@ -90,6 +91,7 @@ class DrawingMgr {
         fill:   shaped.noFill ? 'rgba(0,0,0,0)' : p.fill,
         open:   shaped.open,
       });
+      this._emitStateChange();
     }
     this.draft       = [];
     this.inDraft     = false;
@@ -119,6 +121,37 @@ class DrawingMgr {
     return this._architectModeEnabled;
   }
 
+
+  onStateChange(handler) {
+    this._onStateChange = typeof handler === 'function' ? handler : null;
+  }
+
+  exportState() {
+    return {
+      polygons: structuredClone(this.polygons),
+      smartShapesEnabled: this._smartShapesEnabled,
+      architectModeEnabled: this._architectModeEnabled,
+    };
+  }
+
+  importState(state = {}) {
+    if (!Array.isArray(state.polygons)) return;
+    this.polygons = structuredClone(state.polygons);
+    this.cancelDraft();
+
+    if (typeof state.smartShapesEnabled === 'boolean') {
+      this._smartShapesEnabled = state.smartShapesEnabled;
+    }
+    if (typeof state.architectModeEnabled === 'boolean') {
+      this._architectModeEnabled = state.architectModeEnabled;
+    }
+  }
+
+  _emitStateChange() {
+    if (!this._onStateChange) return;
+    this._onStateChange(this.exportState());
+  }
+
   // ══════════════════════════════════════════════
   //  UNDO / ERASE
   // ══════════════════════════════════════════════
@@ -127,6 +160,7 @@ class DrawingMgr {
   undo() {
     if (this.undoStack.length) {
       this.polygons   = this.undoStack.pop();
+      this._emitStateChange();
     }
     this.cancelDraft();
   }
@@ -136,6 +170,7 @@ class DrawingMgr {
     this._saveUndo();
     this.polygons   = [];
     this.cancelDraft();
+    this._emitStateChange();
   }
 
   /** Trigger an animated red flash effect over the canvas. */
