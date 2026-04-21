@@ -291,48 +291,61 @@ const App = (() => {
       msg.textContent  = text;
     };
 
-    onProgress('Loading gesture model…', 10);
+    drawing.onStateChange(state => {
+      if (applyingRemoteState) return;
+      collab.publishState(state);
+    });
 
-    const gestureMgr = new GestureMgr(
-      document.getElementById('webcam'),
-      document.getElementById('camCanvas'),
-      data => { lastHandData = data; }
-    );
+    collab.onState = state => {
+      applyingRemoteState = true;
+      drawing.importState(state);
+      smartShapesEnabled = drawing.smartShapesEnabled;
+      architectModeEnabled = drawing.architectModeEnabled;
+      syncToolbarState();
+      applyingRemoteState = false;
+    };
 
-    try {
-      await gestureMgr.init(onProgress);
-      hud.setStatus('TRACKING ACTIVE', true);
+    collab.onStatus = ({ connected, message }) => {
+      hud.setStatus(message, connected);
+    };
 
-      drawing.onStateChange(state => {
-        if (applyingRemoteState) return;
-        collab.publishState(state);
-      });
+    collab.onUsers = users => {
+      renderUsers(users);
+    };
 
-      collab.onState = state => {
-        applyingRemoteState = true;
-        drawing.importState(state);
-        smartShapesEnabled = drawing.smartShapesEnabled;
-        architectModeEnabled = drawing.architectModeEnabled;
-        syncToolbarState();
-        applyingRemoteState = false;
-      };
-
-      collab.onStatus = ({ connected, message }) => {
-        hud.setStatus(message, connected);
-      };
-
-      collab.onUsers = users => {
-        renderUsers(users);
-      };
-
+    let authResolved = false;
+    const waitForAuth = new Promise(resolve => {
       collab.onAuth = ({ canWrite: writeAllowed }) => {
         canWrite = writeAllowed;
+        authResolved = true;
         updateWriteAccessUI();
+        resolve();
       };
+    });
 
-      collab.connect({ username, password });
-      setupSidebarToggle();
-      updateWriteAccessUI();
+    collab.connect({ username, password });
+    setupSidebarToggle();
+    updateWriteAccessUI();
+
+    try {
+      await Promise.race([
+        waitForAuth,
+        new Promise(resolve => setTimeout(resolve, 2500)),
+      ]);
+
+      if (authResolved && !canWrite) {
+        onProgress('Joined as read-only viewer (camera disabled)', 100);
+      } else {
+        onProgress('Loading gesture model…', 10);
+        const gestureMgr = new GestureMgr(
+          document.getElementById('webcam'),
+          document.getElementById('camCanvas'),
+          data => { lastHandData = data; }
+        );
+        await gestureMgr.init(onProgress);
+        hud.setStatus('TRACKING ACTIVE', true);
+      }
+
 
     } catch (err) {
       console.error(err);
