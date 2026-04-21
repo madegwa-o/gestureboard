@@ -19,7 +19,7 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
 };
 
-let sharedState = null;
+const roomStates = new Map();
 let nextClientId = 1;
 const WRITE_PASSWORD = '1234';
 const clients = new Map();
@@ -51,10 +51,27 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 
-function broadcast(message, excludeSocket = null) {
+function normalizeRoomId(roomId) {
+  const raw = String(roomId || 'main').trim().toLowerCase();
+  const cleaned = raw.replace(/[^a-z0-9_-]/g, '-').slice(0, 24);
+  return cleaned || 'main';
+}
+
+function usersForRoom(roomId) {
+  return Array.from(clients.values())
+    .filter(client => client.roomId === roomId)
+    .map(client => ({
+      clientId: client.clientId,
+      username: client.username,
+      canWrite: client.canWrite,
+    }));
+}
+
+function broadcastToRoom(roomId, message, excludeSocket = null) {
   const payload = JSON.stringify(message);
   for (const client of wss.clients) {
-    if (client !== excludeSocket && client.readyState === 1) {
+    const clientMeta = clients.get(client);
+    if (client !== excludeSocket && client.readyState === 1 && clientMeta?.roomId === roomId) {
       client.send(payload);
     }
   }
@@ -63,11 +80,7 @@ function broadcast(message, excludeSocket = null) {
 wss.on('connection', (socket) => {
   const clientId = `u${nextClientId++}`;
   socket.send(JSON.stringify({ type: 'welcome', clientId }));
-  clients.set(socket, { clientId, username: `Guest-${clientId}`, canWrite: false });
-
-  if (sharedState) {
-    socket.send(JSON.stringify({ type: 'state', state: sharedState }));
-  }
+  clients.set(socket, { clientId, username: `Guest-${clientId}`, canWrite: false, roomId: 'main' });
 
   socket.on('message', (rawData) => {
     let message;
@@ -80,49 +93,46 @@ wss.on('connection', (socket) => {
     if (message.type === 'join') {
       const username = String(message.username || '').trim().slice(0, 24) || `Guest-${clientId}`;
       const canWrite = message.password === WRITE_PASSWORD;
-      clients.set(socket, { clientId, username, canWrite });
+      const roomId = normalizeRoomId(message.roomId);
+      clients.set(socket, { clientId, username, canWrite, roomId });
       socket.send(JSON.stringify({ type: 'auth', canWrite }));
-      broadcast({
+      const state = roomStates.get(roomId);
+      if (state) {
+        socket.send(JSON.stringify({ type: 'state', state }));
+      }
+      broadcastToRoom(roomId, {
         type: 'users',
-        users: Array.from(clients.values()).map(client => ({
-          clientId: client.clientId,
-          username: client.username,
-          canWrite: client.canWrite,
-        })),
+        users: usersForRoom(roomId),
       });
       return;
     }
 
     if (message.type === 'request-sync') {
-      if (sharedState) {
-        socket.send(JSON.stringify({ type: 'state', state: sharedState }));
+      const roomId = normalizeRoomId(message.roomId || clients.get(socket)?.roomId);
+      const state = roomStates.get(roomId);
+      if (state) {
+        socket.send(JSON.stringify({ type: 'state', state }));
       }
-      const users = Array.from(clients.values()).map(client => ({
-        clientId: client.clientId,
-        username: client.username,
-        canWrite: client.canWrite,
-      }));
-      socket.send(JSON.stringify({ type: 'users', users }));
+      socket.send(JSON.stringify({ type: 'users', users: usersForRoom(roomId) }));
       return;
     }
 
     if (message.type === 'state' && message.state && Array.isArray(message.state.polygons)) {
       const client = clients.get(socket);
       if (!client || !client.canWrite) return;
-      sharedState = message.state;
-      broadcast({ type: 'state', state: sharedState }, socket);
+      const roomId = client.roomId;
+      roomStates.set(roomId, message.state);
+      broadcastToRoom(roomId, { type: 'state', state: message.state }, socket);
     }
   });
 
   socket.on('close', () => {
+    const prev = clients.get(socket);
     clients.delete(socket);
-    broadcast({
+    if (!prev) return;
+    broadcastToRoom(prev.roomId, {
       type: 'users',
-      users: Array.from(clients.values()).map(client => ({
-        clientId: client.clientId,
-        username: client.username,
-        canWrite: client.canWrite,
-      })),
+      users: usersForRoom(prev.roomId),
     });
   });
 });

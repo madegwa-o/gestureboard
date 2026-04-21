@@ -34,6 +34,7 @@ const App = (() => {
   let architectModeEnabled = false;
   let applyingRemoteState = false;
   let canWrite = false;
+  let gestureMgr = null;
 
   // Per-gesture one-shot debounce flags (prevent repeated triggers
   // while a confirmed gesture is held).
@@ -282,7 +283,7 @@ const App = (() => {
     });
   }
 
-  async function start({ username, password }) {
+  async function start({ username, password, roomId, trackingPreset }) {
     const fill = document.getElementById('ldFill');
     const msg  = document.getElementById('ldMsg');
 
@@ -323,7 +324,7 @@ const App = (() => {
       };
     });
 
-    collab.connect({ username, password });
+    collab.connect({ username, password, roomId });
     setupSidebarToggle();
     updateWriteAccessUI();
 
@@ -337,9 +338,10 @@ const App = (() => {
         onProgress('Joined as read-only viewer (camera disabled)', 100);
       } else {
         onProgress('Loading gesture model…', 10);
-        const gestureMgr = new GestureMgr(
+        gestureMgr = new GestureMgr(
           document.getElementById('webcam'),
           document.getElementById('camCanvas'),
+          { preset: trackingPreset },
           data => { lastHandData = data; }
         );
         await gestureMgr.init(onProgress);
@@ -426,6 +428,10 @@ const App = (() => {
       hud.flashGesture(architectModeEnabled ? '📐 ARCH MODE' : '📐 FREE ANGLES');
     },
 
+    resetTracking() {
+      window.location.reload();
+    },
+
     /**
      * Export the current canvas state as a PNG download.
      * Composites the rendered main canvas onto a clean export canvas.
@@ -452,18 +458,31 @@ const App = (() => {
 window.addEventListener('DOMContentLoaded', () => {
   const joinForm = document.getElementById('joinForm');
   const joinOverlay = document.getElementById('joinOverlay');
+  const resetTrackingBtn = document.getElementById('watchdogReset');
+  if (resetTrackingBtn) {
+    resetTrackingBtn.addEventListener('click', () => App.resetTracking());
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const queryRoom = params.get('room') || 'main';
+  const queryPreset = params.get('preset') || 'balanced';
   if (!joinForm || !joinOverlay) {
-    App.start({ username: 'Guest', password: '' }).catch(console.error);
+    App.start({ username: 'Guest', password: '', roomId: queryRoom, trackingPreset: queryPreset }).catch(console.error);
     return;
   }
+
+  if (joinForm.roomId) joinForm.roomId.value = queryRoom;
+  if (joinForm.trackingPreset) joinForm.trackingPreset.value = queryPreset;
 
   joinForm.addEventListener('submit', (event) => {
     event.preventDefault();
     const username = joinForm.username.value.trim();
     const password = joinForm.password.value.trim();
+    const roomId = joinForm.roomId?.value.trim() || 'main';
+    const trackingPreset = joinForm.trackingPreset?.value || 'balanced';
     if (!username) return;
 
     joinOverlay.style.display = 'none';
-    App.start({ username, password }).catch(console.error);
+    App.start({ username, password, roomId, trackingPreset }).catch(console.error);
   });
 });

@@ -12,8 +12,9 @@ class PointerSmoother {
    * @param {number} alpha  Base smoothing factor (0 = fully lagged, 1 = raw).
    *                        Defaults to Config.SMOOTH_ALPHA.
    */
-  constructor(alpha = Config.SMOOTH_ALPHA) {
+  constructor(alpha = Config.SMOOTH_ALPHA, alphaFast = Config.SMOOTH_ALPHA_FAST) {
     this._alpha = alpha;
+    this._alphaFast = alphaFast;
     this._x = null;
     this._y = null;
   }
@@ -39,7 +40,7 @@ class PointerSmoother {
     // Normalise velocity to [0, 1] relative to screen diagonal.
     const screenDiag = Math.hypot(window.innerWidth, window.innerHeight);
     const t     = Math.min(1, vel / (screenDiag / Config.VEL_NORM));
-    const alpha = this._alpha + t * (Config.SMOOTH_ALPHA_FAST - this._alpha);
+    const alpha = this._alpha + t * (this._alphaFast - this._alpha);
 
     this._x += alpha * dx;
     this._y += alpha * dy;
