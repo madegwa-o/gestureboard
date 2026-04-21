@@ -98,7 +98,8 @@ body {
   color: var(--text-2);
 }
 
-#joinForm input {
+#joinForm input,
+#joinForm select {
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
@@ -570,6 +571,18 @@ body {
 }
 
 #watchdogWarn.visible { display: block; }
+
+#watchdogReset {
+  margin-left: 10px;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  cursor: pointer;
+}
 
 
 /* ══════════════════════════════════════════════

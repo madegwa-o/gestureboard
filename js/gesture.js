@@ -18,14 +18,15 @@ class GestureMgr {
    * @param {HTMLCanvasElement}  overlayCanvas Small canvas drawn over the camera preview
    * @param {Function}           onResults     Callback receiving processed hand data
    */
-  constructor(videoEl, overlayCanvas, onResults) {
+  constructor(videoEl, overlayCanvas, options = {}, onResults) {
     this.videoEl   = videoEl;
     this.overlay   = overlayCanvas;
     this.octx      = overlayCanvas.getContext('2d');
     this.onResults = onResults;
+    this.preset = this._resolvePreset(options.preset);
 
     // One smoother per possible hand slot
-    this._smoothers  = Array.from({ length: 2 }, () => new PointerSmoother());
+    this._smoothers  = Array.from({ length: 2 }, () => new PointerSmoother(this.preset.smoothAlpha, this.preset.smoothAlphaFast));
     this._lastG      = ['none', 'none'];
     this._holdCnt    = [0, 0];
     this._confirmed  = ['none', 'none'];
@@ -55,8 +56,8 @@ class GestureMgr {
     this.hands.setOptions({
       maxNumHands:             2,
       modelComplexity:         1,
-      minDetectionConfidence:  Config.DETECT_CONF,
-      minTrackingConfidence:   Config.TRACK_CONF,
+      minDetectionConfidence:  this.preset.detectConf,
+      minTrackingConfidence:   this.preset.trackConf,
     });
 
     this.hands.onResults(r => this._process(r));
@@ -92,6 +93,40 @@ class GestureMgr {
       const stale = performance.now() - this._lastResultTime > Config.WATCHDOG_MS;
       this._watchdogEl.classList.toggle('visible', stale);
     }, 1000);
+  }
+
+  _resolvePreset(presetName) {
+    const PRESETS = {
+      stable: {
+        smoothAlpha: 0.12,
+        smoothAlphaFast: 0.3,
+        holdFrames: 6,
+        holdDecay: 2,
+        pinchDist: 0.06,
+        detectConf: 0.78,
+        trackConf: 0.82,
+      },
+      balanced: {
+        smoothAlpha: Config.SMOOTH_ALPHA,
+        smoothAlphaFast: Config.SMOOTH_ALPHA_FAST,
+        holdFrames: Config.HOLD_FRAMES,
+        holdDecay: Config.HOLD_DECAY,
+        pinchDist: Config.PINCH_DIST,
+        detectConf: Config.DETECT_CONF,
+        trackConf: Config.TRACK_CONF,
+      },
+      fast: {
+        smoothAlpha: 0.24,
+        smoothAlphaFast: 0.48,
+        holdFrames: 3,
+        holdDecay: 2,
+        pinchDist: 0.075,
+        detectConf: 0.68,
+        trackConf: 0.72,
+      },
+    };
+
+    return PRESETS[presetName] || PRESETS.balanced;
   }
 
   // ══════════════════════════════════════════════
@@ -151,7 +186,7 @@ class GestureMgr {
 
     // Pinch: thumb tip close to index tip
     const pd = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
-    if (pd < Config.PINCH_DIST) return 'pinch';
+    if (pd < this.preset.pinchDist) return 'pinch';
 
     return 'unknown';
   }
@@ -198,16 +233,16 @@ class GestureMgr {
       // ─── Hysteresis debounce ──────────────────────────────
       if (gesture === this._lastG[i]) {
         // Same gesture: increment hold counter (capped at HOLD_FRAMES)
-        this._holdCnt[i] = Math.min(Config.HOLD_FRAMES, this._holdCnt[i] + 1);
+        this._holdCnt[i] = Math.min(this.preset.holdFrames, this._holdCnt[i] + 1);
       } else {
         // Different gesture: decay rather than instantly reset
-        this._holdCnt[i] = Math.max(0, this._holdCnt[i] - Config.HOLD_DECAY);
+        this._holdCnt[i] = Math.max(0, this._holdCnt[i] - this.preset.holdDecay);
         // Only commit the new gesture once the count fully decays
         if (this._holdCnt[i] === 0) this._lastG[i] = gesture;
       }
 
       // Confirm gesture once hold threshold is reached
-      if (this._holdCnt[i] >= Config.HOLD_FRAMES) {
+      if (this._holdCnt[i] >= this.preset.holdFrames) {
         this._confirmed[i] = gesture;
       }
 
@@ -224,7 +259,7 @@ class GestureMgr {
         confirmed:    this._confirmed[i],
         lm,
         wrist,
-        holdProgress: this._holdCnt[i] / Config.HOLD_FRAMES, // 0–1 for cursor arc
+        holdProgress: this._holdCnt[i] / this.preset.holdFrames, // 0–1 for cursor arc
       };
     });
 
@@ -244,7 +279,7 @@ class GestureMgr {
     this.onResults({
       hands:      handData,
       count,
-      confidence: avgConf / Config.HOLD_FRAMES,
+      confidence: avgConf / this.preset.holdFrames,
     });
   }
 }

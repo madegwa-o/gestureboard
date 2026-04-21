@@ -18,6 +18,18 @@
         Password (optional)
         <input type="password" name="password" placeholder="1234 for write access">
       </label>
+      <label>
+        Room
+        <input type="text" name="roomId" maxlength="24" placeholder="main" value="main">
+      </label>
+      <label>
+        Tracking preset
+        <select name="trackingPreset">
+          <option value="balanced" selected>Balanced</option>
+          <option value="stable">Stable (less jitter)</option>
+          <option value="fast">Fast (less latency)</option>
+        </select>
+      </label>
       <button type="submit">Join</button>
       <p id="accessBadge">READ ONLY</p>
     </form>
@@ -35,7 +47,7 @@
   <div id="gFlash"></div>
 
   <!-- ─── Watchdog Warning ─── -->
-  <div id="watchdogWarn">⚠ TRACKING LOST — RECONNECTING…</div>
+  <div id="watchdogWarn">⚠ TRACKING LOST — TRY RESET <button id="watchdogReset" type="button">RESET TRACKER</button></div>
 
   <!-- ─── Main Drawing Canvas ─── -->
   <canvas id="mainCanvas"></canvas>
