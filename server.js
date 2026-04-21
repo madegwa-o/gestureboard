@@ -21,6 +21,8 @@ const MIME_TYPES = {
 
 let sharedState = null;
 let nextClientId = 1;
+const WRITE_PASSWORD = '1234';
+const clients = new Map();
 
 const server = http.createServer((req, res) => {
   const reqPath = req.url === '/' ? '/index.html' : req.url;
@@ -61,6 +63,7 @@ function broadcast(message, excludeSocket = null) {
 wss.on('connection', (socket) => {
   const clientId = `u${nextClientId++}`;
   socket.send(JSON.stringify({ type: 'welcome', clientId }));
+  clients.set(socket, { clientId, username: `Guest-${clientId}`, canWrite: false });
 
   if (sharedState) {
     socket.send(JSON.stringify({ type: 'state', state: sharedState }));
@@ -74,17 +77,53 @@ wss.on('connection', (socket) => {
       return;
     }
 
+    if (message.type === 'join') {
+      const username = String(message.username || '').trim().slice(0, 24) || `Guest-${clientId}`;
+      const canWrite = message.password === WRITE_PASSWORD;
+      clients.set(socket, { clientId, username, canWrite });
+      socket.send(JSON.stringify({ type: 'auth', canWrite }));
+      broadcast({
+        type: 'users',
+        users: Array.from(clients.values()).map(client => ({
+          clientId: client.clientId,
+          username: client.username,
+          canWrite: client.canWrite,
+        })),
+      });
+      return;
+    }
+
     if (message.type === 'request-sync') {
       if (sharedState) {
         socket.send(JSON.stringify({ type: 'state', state: sharedState }));
       }
+      const users = Array.from(clients.values()).map(client => ({
+        clientId: client.clientId,
+        username: client.username,
+        canWrite: client.canWrite,
+      }));
+      socket.send(JSON.stringify({ type: 'users', users }));
       return;
     }
 
     if (message.type === 'state' && message.state && Array.isArray(message.state.polygons)) {
+      const client = clients.get(socket);
+      if (!client || !client.canWrite) return;
       sharedState = message.state;
       broadcast({ type: 'state', state: sharedState }, socket);
     }
+  });
+
+  socket.on('close', () => {
+    clients.delete(socket);
+    broadcast({
+      type: 'users',
+      users: Array.from(clients.values()).map(client => ({
+        clientId: client.clientId,
+        username: client.username,
+        canWrite: client.canWrite,
+      })),
+    });
   });
 });
 
