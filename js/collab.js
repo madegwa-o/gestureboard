@@ -6,24 +6,32 @@
 'use strict';
 
 class CollabMgr {
-  constructor({ onState, onStatus } = {}) {
+  constructor({ onState, onStatus, onUsers, onAuth } = {}) {
     this.onState = typeof onState === 'function' ? onState : () => {};
     this.onStatus = typeof onStatus === 'function' ? onStatus : () => {};
+    this.onUsers = typeof onUsers === 'function' ? onUsers : () => {};
+    this.onAuth = typeof onAuth === 'function' ? onAuth : () => {};
 
     this.socket = null;
     this.clientId = null;
+    this.username = '';
+    this.canWrite = false;
     this._reconnectTimer = null;
     this._lastSent = null;
   }
 
-  connect(url = this._defaultUrl()) {
+  connect({ url = this._defaultUrl(), username = 'Guest', password = '' } = {}) {
     if (this.socket && this.socket.readyState <= 1) return;
+
+    this.username = (username || 'Guest').trim();
+    this._password = password || '';
 
     this.onStatus({ connected: false, message: 'CONNECTING COLLAB…' });
     this.socket = new WebSocket(url);
 
     this.socket.addEventListener('open', () => {
       this.onStatus({ connected: true, message: 'COLLAB ONLINE' });
+      this._send({ type: 'join', username: this.username, password: this._password });
       this._send({ type: 'request-sync' });
     });
 
@@ -37,6 +45,17 @@ class CollabMgr {
 
       if (message.type === 'welcome') {
         this.clientId = message.clientId;
+        return;
+      }
+
+      if (message.type === 'auth') {
+        this.canWrite = !!message.canWrite;
+        this.onAuth({ canWrite: this.canWrite });
+        return;
+      }
+
+      if (message.type === 'users' && Array.isArray(message.users)) {
+        this.onUsers(message.users);
         return;
       }
 
@@ -56,7 +75,7 @@ class CollabMgr {
   }
 
   publishState(state) {
-    if (!state) return;
+    if (!state || !this.canWrite) return;
 
     const serialized = JSON.stringify(state);
     if (serialized === this._lastSent) return;
@@ -74,7 +93,7 @@ class CollabMgr {
     if (this._reconnectTimer) return;
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;
-      this.connect(url);
+      this.connect({ url, username: this.username, password: this._password });
     }, 2000);
   }
 

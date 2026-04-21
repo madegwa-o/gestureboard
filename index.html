@@ -7,6 +7,21 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div id="joinOverlay">
+    <form id="joinForm" autocomplete="off">
+      <h1>Join Room</h1>
+      <label>
+        Username
+        <input type="text" name="username" required maxlength="24" placeholder="Enter username">
+      </label>
+      <label>
+        Password (optional)
+        <input type="password" name="password" placeholder="1234 for write access">
+      </label>
+      <button type="submit">Join</button>
+      <p id="accessBadge">READ ONLY</p>
+    </form>
+  </div>
 
   <!-- ─── Loading Screen ─── -->
   <div id="loading">
@@ -85,6 +100,12 @@
       <span class="legend-text"><strong>ROCK-ON</strong>Undo last</span>
     </div>
   </div>
+
+  <button id="usersToggle" class="users-toggle">👥 USERS</button>
+  <aside id="usersSidebar">
+    <div class="users-sidebar-head">Room Users (<span id="userCount">0</span>)</div>
+    <ul id="userList"></ul>
+  </aside>
 
   <!-- ─── Status Bar: Bottom Left ─── -->
   <div id="statusBar">

@@ -33,6 +33,7 @@ const App = (() => {
   let smartShapesEnabled = false;
   let architectModeEnabled = false;
   let applyingRemoteState = false;
+  let canWrite = false;
 
   // Per-gesture one-shot debounce flags (prevent repeated triggers
   // while a confirmed gesture is held).
@@ -160,7 +161,7 @@ const App = (() => {
     const sp = h.smoothed;   // smoothed screen-space position
 
     // ERASE — fist (confirmed, one-shot)
-    if (gc === 'fist') {
+    if (gc === 'fist' && canWrite) {
       if (!lastConfirmedErase) {
         lastConfirmedErase = true;
         drawing.eraseAll();
@@ -174,7 +175,7 @@ const App = (() => {
     }
 
     // UNDO — rock-on (confirmed, one-shot)
-    if (gc === 'rockon') {
+    if (gc === 'rockon' && canWrite) {
       if (!lastConfirmedRock) {
         lastConfirmedRock = true;
         drawing.undo();
@@ -187,7 +188,7 @@ const App = (() => {
     }
 
     // FINALIZE — peace sign
-    if (g === 'peace') {
+    if (g === 'peace' && canWrite) {
       const conf = lastHandData.confidence || 0;
       const canUseSmartShape = smartShapesEnabled && conf >= Config.SHAPE_CONFIDENCE_MIN;
       const minFinalizePts = canUseSmartShape ? 2 : 3;
@@ -205,7 +206,7 @@ const App = (() => {
     const drawActive = mode.is('drawing')
       ? (g === 'point' || gc === 'point')
       : (gc === 'point');
-    if (drawActive) {
+    if (drawActive && canWrite) {
       const w = tr.toWorld(sp.x, sp.y);
       drawing.addDraftPt(w.x, w.y);
       mode.to('drawing');
@@ -216,7 +217,7 @@ const App = (() => {
     // Use the wrist landmark as the anchor point: it's the most stable
     // part of the hand and doesn't jump around like fingertips do.
     if (g === 'open') {
-      if (mode.is('drawing')) {
+      if (mode.is('drawing') && canWrite) {
         drawing.finalizeDraft({ source: 'auto', confidence: lastHandData.confidence || 0 });
         hud.flashGesture('🖐️ SAVED');
       }
@@ -237,7 +238,7 @@ const App = (() => {
     if (panActive) { tr.endPan(); panActive = false; }
 
     // Unknown / transitional gesture — finalize any open draft and go passive
-    if (mode.is('drawing')) {
+    if (mode.is('drawing') && canWrite) {
       drawing.finalizeDraft({ source: 'auto', confidence: lastHandData.confidence || 0 });
       hud.flashGesture('✅ SAVED');
     }
@@ -248,7 +249,40 @@ const App = (() => {
   //  STARTUP
   // ══════════════════════════════════════════════
 
-  async function start() {
+  function updateWriteAccessUI() {
+    const accessBadge = document.getElementById('accessBadge');
+    if (accessBadge) {
+      accessBadge.textContent = canWrite ? 'WRITE ACCESS' : 'READ ONLY';
+      accessBadge.classList.toggle('write', canWrite);
+    }
+  }
+
+  function renderUsers(users = []) {
+    const list = document.getElementById('userList');
+    const count = document.getElementById('userCount');
+    if (!list || !count) return;
+
+    list.innerHTML = '';
+    users.forEach(user => {
+      const li = document.createElement('li');
+      li.className = 'user-item';
+      li.textContent = `${user.username}${user.canWrite ? ' • write' : ''}`;
+      list.appendChild(li);
+    });
+    count.textContent = String(users.length);
+  }
+
+  function setupSidebarToggle() {
+    const toggleBtn = document.getElementById('usersToggle');
+    const sidebar = document.getElementById('usersSidebar');
+    if (!toggleBtn || !sidebar) return;
+
+    toggleBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+    });
+  }
+
+  async function start({ username, password }) {
     const fill = document.getElementById('ldFill');
     const msg  = document.getElementById('ldMsg');
 
@@ -287,7 +321,18 @@ const App = (() => {
         hud.setStatus(message, connected);
       };
 
-      collab.connect();
+      collab.onUsers = users => {
+        renderUsers(users);
+      };
+
+      collab.onAuth = ({ canWrite: writeAllowed }) => {
+        canWrite = writeAllowed;
+        updateWriteAccessUI();
+      };
+
+      collab.connect({ username, password });
+      setupSidebarToggle();
+      updateWriteAccessUI();
 
     } catch (err) {
       console.error(err);
@@ -329,12 +374,14 @@ const App = (() => {
     start,
 
     eraseAll() {
+      if (!canWrite) return;
       drawing.eraseAll();
       drawing.flashErase();
       hud.flashGesture('✊ ERASE');
     },
 
     undo() {
+      if (!canWrite) return;
       drawing.undo();
       hud.flashGesture('🤘 UNDO');
     },
@@ -344,6 +391,7 @@ const App = (() => {
     },
 
     toggleShapeIntelligence() {
+      if (!canWrite) return;
       smartShapesEnabled = !smartShapesEnabled;
       drawing.setSmartShapesEnabled(smartShapesEnabled);
       if (!smartShapesEnabled && architectModeEnabled) {
@@ -356,6 +404,7 @@ const App = (() => {
     },
 
     toggleArchitectMode() {
+      if (!canWrite) return;
       if (!smartShapesEnabled) return;
       architectModeEnabled = !architectModeEnabled;
       drawing.setArchitectModeEnabled(architectModeEnabled);
@@ -387,5 +436,21 @@ const App = (() => {
 
 })();
 
-// Kick everything off
-App.start().catch(console.error);
+window.addEventListener('DOMContentLoaded', () => {
+  const joinForm = document.getElementById('joinForm');
+  const joinOverlay = document.getElementById('joinOverlay');
+  if (!joinForm || !joinOverlay) {
+    App.start({ username: 'Guest', password: '' }).catch(console.error);
+    return;
+  }
+
+  joinForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const username = joinForm.username.value.trim();
+    const password = joinForm.password.value.trim();
+    if (!username) return;
+
+    joinOverlay.style.display = 'none';
+    App.start({ username, password }).catch(console.error);
+  });
+});
